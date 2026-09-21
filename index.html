@@ -6,7 +6,6 @@
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
     
     <style>
-      /* The Tap-to-Start Interface */
       #ui-layer {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background-color: #000; color: #fff; z-index: 9999;
@@ -18,15 +17,20 @@
         background-color: #fff; color: #000; border: none; border-radius: 8px;
         margin-top: 20px; cursor: pointer;
       }
+      .version-tag {
+        position: absolute; bottom: 15px; font-size: 12px; color: #666;
+      }
     </style>
   </head>
   
   <body>
-    <!-- User Interaction Screen -->
     <div id="ui-layer">
       <h2>AR Gallery Ready</h2>
       <p>Please allow camera access when prompted.</p>
       <button id="start-btn">Tap to Start AR</button>
+      
+      <!-- VERSION NUMBER -->
+      <div class="version-tag">v2.0</div>
     </div>
 
     <script>
@@ -38,36 +42,15 @@
           const el = this.el;
           
           const applyResize = () => {
-            if (video.videoWidth === 0) return; // Failsafe
+            if (video.videoWidth === 0) return; 
             const ratio = video.videoWidth / video.videoHeight;
             const targetHeight = 1 / ratio; 
             
             const aVideo = el.querySelector('a-video');
             aVideo.setAttribute('width', '1');
             aVideo.setAttribute('height', targetHeight.toString());
-
-            const top = el.querySelector('.mask-top');
-            top.setAttribute('position', `0 ${targetHeight/2 + 0.5} 0.01`);
-            top.setAttribute('width', '3');
-            top.setAttribute('height', '1');
-
-            const bottom = el.querySelector('.mask-bottom');
-            bottom.setAttribute('position', `0 ${-(targetHeight/2 + 0.5)} 0.01`);
-            bottom.setAttribute('width', '3');
-            bottom.setAttribute('height', '1');
-
-            const left = el.querySelector('.mask-left');
-            left.setAttribute('position', `-1 0 0.01`);
-            left.setAttribute('width', '1');
-            left.setAttribute('height', targetHeight + 2);
-
-            const right = el.querySelector('.mask-right');
-            right.setAttribute('position', `1 0 0.01`);
-            right.setAttribute('width', '1');
-            right.setAttribute('height', targetHeight + 2);
           };
 
-          // Apply resize the exact moment the video metadata unlocks
           video.addEventListener('loadedmetadata', applyResize);
           if (video.readyState >= 1) applyResize();
         }
@@ -82,14 +65,10 @@
 
         if (trackerLink && video1Link && video2Link) {
           
-          // Wait for the user to tap the start button
           document.getElementById('start-btn').addEventListener('click', function() {
-            
-            // Hide the button screen
             document.getElementById('ui-layer').style.display = 'none';
 
-            // Inject the AR Scene into the page ONLY AFTER the button is tapped.
-            // This prevents the AR engine from crashing on load.
+            // Clean scene without the glitchy masks
             const sceneHTML = `
               <a-scene mindar-image="imageTargetSrc: ${trackerLink};" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
                 
@@ -103,19 +82,11 @@
                 <!-- TARGET 1 -->
                 <a-entity mindar-image-target="targetIndex: 0" adaptive-ar="vid: #vid1">
                   <a-video src="#vid1" position="0 0 0" rotation="0 0 0"></a-video>
-                  <a-plane class="mask-top" material="colorWrite: false"></a-plane>
-                  <a-plane class="mask-bottom" material="colorWrite: false"></a-plane>
-                  <a-plane class="mask-left" material="colorWrite: false"></a-plane>
-                  <a-plane class="mask-right" material="colorWrite: false"></a-plane>
                 </a-entity>
 
                 <!-- TARGET 2 -->
                 <a-entity mindar-image-target="targetIndex: 1" adaptive-ar="vid: #vid2">
                   <a-video src="#vid2" position="0 0 0" rotation="0 0 0"></a-video>
-                  <a-plane class="mask-top" material="colorWrite: false"></a-plane>
-                  <a-plane class="mask-bottom" material="colorWrite: false"></a-plane>
-                  <a-plane class="mask-left" material="colorWrite: false"></a-plane>
-                  <a-plane class="mask-right" material="colorWrite: false"></a-plane>
                 </a-entity>
 
               </a-scene>
@@ -125,7 +96,7 @@
           });
 
         } else {
-          document.getElementById('ui-layer').innerHTML = "<h2>Data Missing</h2><p>Please scan a valid client print.</p>";
+          document.getElementById('ui-layer').innerHTML = "<h2>Data Missing</h2><p>Please scan a valid client print.</p><div class='version-tag'>v2.0</div>";
         }
       });
     </script>
