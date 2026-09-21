@@ -1,145 +1,133 @@
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AR Gallery Player Pro - Pre-Load</title>
+    <title>AR Gallery Player Pro</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
     
     <style>
-      /* Simple full-screen loading overlay */
-      #loader {
+      /* The Tap-to-Start Interface */
+      #ui-layer {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background-color: #000; color: #fff; z-index: 9999;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        font-family: sans-serif;
+        font-family: sans-serif; text-align: center;
       }
-      .hidden { display: none !important; }
+      button {
+        padding: 15px 30px; font-size: 18px; font-weight: bold;
+        background-color: #fff; color: #000; border: none; border-radius: 8px;
+        margin-top: 20px; cursor: pointer;
+      }
     </style>
+  </head>
+  
+  <body>
+    <!-- User Interaction Screen -->
+    <div id="ui-layer">
+      <h2>AR Gallery Ready</h2>
+      <p>Please allow camera access when prompted.</p>
+      <button id="start-btn">Tap to Start AR</button>
+    </div>
 
     <script>
-      // 1. PRE-LOAD AND SHAPE SCRIPT
-      // This forces the geometry to wait for the video dimensions before building the scene.
+      // 1. THE ADAPTIVE SHAPE ENGINE
       AFRAME.registerComponent('adaptive-ar', {
         schema: { vid: { type: 'selector' } },
         init: function () {
           const video = this.data.vid;
+          const el = this.el;
           
-          // We know the dimensions are loaded because the pre-loader guaranteed it
-          const ratio = video.videoWidth / video.videoHeight;
-          const targetHeight = 1 / ratio; // MindAR width is always 1
-          
-          // Set the video plane geometry
-          const aVideo = this.el.querySelector('a-video');
-          aVideo.setAttribute('width', '1');
-          aVideo.setAttribute('height', targetHeight.toString());
+          const applyResize = () => {
+            if (video.videoWidth === 0) return; // Failsafe
+            const ratio = video.videoWidth / video.videoHeight;
+            const targetHeight = 1 / ratio; 
+            
+            const aVideo = el.querySelector('a-video');
+            aVideo.setAttribute('width', '1');
+            aVideo.setAttribute('height', targetHeight.toString());
 
-          // Set the invisible occlusion masks
-          const top = this.el.querySelector('.mask-top');
-          top.setAttribute('position', `0 ${targetHeight/2 + 0.5} 0.01`);
-          top.setAttribute('width', '3');
-          top.setAttribute('height', '1');
+            const top = el.querySelector('.mask-top');
+            top.setAttribute('position', `0 ${targetHeight/2 + 0.5} 0.01`);
+            top.setAttribute('width', '3');
+            top.setAttribute('height', '1');
 
-          const bottom = this.el.querySelector('.mask-bottom');
-          bottom.setAttribute('position', `0 ${-(targetHeight/2 + 0.5)} 0.01`);
-          bottom.setAttribute('width', '3');
-          bottom.setAttribute('height', '1');
+            const bottom = el.querySelector('.mask-bottom');
+            bottom.setAttribute('position', `0 ${-(targetHeight/2 + 0.5)} 0.01`);
+            bottom.setAttribute('width', '3');
+            bottom.setAttribute('height', '1');
 
-          const left = this.el.querySelector('.mask-left');
-          left.setAttribute('position', `-1 0 0.01`);
-          left.setAttribute('width', '1');
-          left.setAttribute('height', targetHeight + 2);
+            const left = el.querySelector('.mask-left');
+            left.setAttribute('position', `-1 0 0.01`);
+            left.setAttribute('width', '1');
+            left.setAttribute('height', targetHeight + 2);
 
-          const right = this.el.querySelector('.mask-right');
-          right.setAttribute('position', `1 0 0.01`);
-          right.setAttribute('width', '1');
-          right.setAttribute('height', targetHeight + 2);
+            const right = el.querySelector('.mask-right');
+            right.setAttribute('position', `1 0 0.01`);
+            right.setAttribute('width', '1');
+            right.setAttribute('height', targetHeight + 2);
+          };
+
+          // Apply resize the exact moment the video metadata unlocks
+          video.addEventListener('loadedmetadata', applyResize);
+          if (video.readyState >= 1) applyResize();
         }
       });
 
-      // 2. THE PRE-LOADER MANAGER
+      // 2. THE MASTER CONTROLLER
       document.addEventListener("DOMContentLoaded", function() {
         const urlParams = new URLSearchParams(window.location.search);
         const trackerLink = urlParams.get('mind');
         const video1Link = urlParams.get('v1');
         const video2Link = urlParams.get('v2');
 
-        const vid1 = document.getElementById('vid1');
-        const vid2 = document.getElementById('vid2');
-        const sceneEl = document.querySelector('a-scene');
-        const loader = document.getElementById('loader');
-
-        let loadedCount = 0;
-
-        // Check if all data is provided via URL
-        if(trackerLink && video1Link && video2Link) {
+        if (trackerLink && video1Link && video2Link) {
           
-          // Set the tracking target
-          sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${trackerLink};`);
-          
-          // Assign the Dropbox links to the hidden video elements
-          vid1.src = video1Link;
-          vid2.src = video2Link;
+          // Wait for the user to tap the start button
+          document.getElementById('start-btn').addEventListener('click', function() {
+            
+            // Hide the button screen
+            document.getElementById('ui-layer').style.display = 'none';
 
-          // Function to check when a video has loaded its metadata
-          function checkVideoLoaded() {
-            loadedCount++;
-            if(loadedCount === 2) {
-              // Both videos have their dimensions ready. Remove loader and start AR.
-              loader.classList.add('hidden');
-              vid1.play();
-              vid2.play();
-            }
-          }
+            // Inject the AR Scene into the page ONLY AFTER the button is tapped.
+            // This prevents the AR engine from crashing on load.
+            const sceneHTML = `
+              <a-scene mindar-image="imageTargetSrc: ${trackerLink};" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+                
+                <a-assets>
+                  <video id="vid1" src="${video1Link}" autoplay loop muted crossorigin="anonymous" playsinline></video>
+                  <video id="vid2" src="${video2Link}" autoplay loop muted crossorigin="anonymous" playsinline></video>
+                </a-assets>
 
-          // Listen for the metadata (dimensions) to load from Dropbox
-          vid1.addEventListener('loadedmetadata', checkVideoLoaded);
-          vid2.addEventListener('loadedmetadata', checkVideoLoaded);
+                <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+                <!-- TARGET 1 -->
+                <a-entity mindar-image-target="targetIndex: 0" adaptive-ar="vid: #vid1">
+                  <a-video src="#vid1" position="0 0 0" rotation="0 0 0"></a-video>
+                  <a-plane class="mask-top" material="colorWrite: false"></a-plane>
+                  <a-plane class="mask-bottom" material="colorWrite: false"></a-plane>
+                  <a-plane class="mask-left" material="colorWrite: false"></a-plane>
+                  <a-plane class="mask-right" material="colorWrite: false"></a-plane>
+                </a-entity>
+
+                <!-- TARGET 2 -->
+                <a-entity mindar-image-target="targetIndex: 1" adaptive-ar="vid: #vid2">
+                  <a-video src="#vid2" position="0 0 0" rotation="0 0 0"></a-video>
+                  <a-plane class="mask-top" material="colorWrite: false"></a-plane>
+                  <a-plane class="mask-bottom" material="colorWrite: false"></a-plane>
+                  <a-plane class="mask-left" material="colorWrite: false"></a-plane>
+                  <a-plane class="mask-right" material="colorWrite: false"></a-plane>
+                </a-entity>
+
+              </a-scene>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', sceneHTML);
+          });
 
         } else {
-          loader.innerHTML = "<h2>Awaiting QR Code Data.</h2><p>Please scan a valid client print.</p>";
+          document.getElementById('ui-layer').innerHTML = "<h2>Data Missing</h2><p>Please scan a valid client print.</p>";
         }
       });
     </script>
-  </head>
-  
-  <body>
-    <!-- The Loading Screen -->
-    <div id="loader">
-      <h2>Loading AR Experience...</h2>
-      <p>Preparing assets...</p>
-    </div>
-
-    <!-- The AR Scene -->
-    <a-scene color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-      
-      <!-- Hidden Video Elements (They load in the background first) -->
-      <a-assets>
-        <video id="vid1" loop muted crossorigin="anonymous" playsinline></video>
-        <video id="vid2" loop muted crossorigin="anonymous" playsinline></video>
-      </a-assets>
-
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-      <!-- TARGET 1 -->
-      <a-entity mindar-image-target="targetIndex: 0" adaptive-ar="vid: #vid1">
-        <a-video src="#vid1" position="0 0 0" rotation="0 0 0"></a-video>
-        <!-- Invisible Masks -->
-        <a-plane class="mask-top" material="colorWrite: false"></a-plane>
-        <a-plane class="mask-bottom" material="colorWrite: false"></a-plane>
-        <a-plane class="mask-left" material="colorWrite: false"></a-plane>
-        <a-plane class="mask-right" material="colorWrite: false"></a-plane>
-      </a-entity>
-
-      <!-- TARGET 2 -->
-      <a-entity mindar-image-target="targetIndex: 1" adaptive-ar="vid: #vid2">
-        <a-video src="#vid2" position="0 0 0" rotation="0 0 0"></a-video>
-        <!-- Invisible Masks -->
-        <a-plane class="mask-top" material="colorWrite: false"></a-plane>
-        <a-plane class="mask-bottom" material="colorWrite: false"></a-plane>
-        <a-plane class="mask-left" material="colorWrite: false"></a-plane>
-        <a-plane class="mask-right" material="colorWrite: false"></a-plane>
-      </a-entity>
-      
-    </a-scene>
   </body>
 </html>
