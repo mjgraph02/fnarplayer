@@ -12,23 +12,44 @@
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         font-family: sans-serif; text-align: center;
       }
+      .hidden { display: none !important; }
+      
       button {
         padding: 15px 30px; font-size: 18px; font-weight: bold;
         background-color: #fff; color: #000; border: none; border-radius: 8px;
         margin-top: 20px; cursor: pointer;
       }
-      .version-tag {
-        position: absolute; bottom: 15px; font-size: 12px; color: #666;
+      
+      /* Animated Loading Spinner */
+      .loader {
+        border: 6px solid #333; border-top: 6px solid #fff;
+        border-radius: 50%; width: 50px; height: 50px;
+        animation: spin 1s linear infinite; margin-bottom: 20px;
       }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      
+      .version-tag { position: absolute; bottom: 15px; font-size: 12px; color: #666; }
     </style>
   </head>
   
   <body>
+    <!-- Full Screen UI Overlay -->
     <div id="ui-layer">
-      <h2>AR Gallery Ready</h2>
-      <p>Please allow camera access when prompted.</p>
-      <button id="start-btn">Tap to Start AR</button>
-      <div class="version-tag">v3.0 - Dynamic</div>
+      
+      <!-- Phase 1: Loading Screen -->
+      <div id="loading-view">
+        <div class="loader"></div>
+        <h2>Loading AR Engine...</h2>
+        <p style="color: #aaa; font-size: 14px;">Please allow camera access if prompted.</p>
+      </div>
+
+      <!-- Phase 2: Ready Screen -->
+      <div id="ready-view" class="hidden">
+        <h2>AR Gallery Ready</h2>
+        <button id="start-btn">Tap to Start AR</button>
+      </div>
+      
+      <div class="version-tag">v4.0 - Pre-Loader</div>
     </div>
 
     <script>
@@ -59,7 +80,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const trackerLink = urlParams.get('mind');
         
-        // Dynamically find how many videos (v1, v2, v3, etc.) are in the URL
         let videos = [];
         let index = 1;
         while (urlParams.has('v' + index)) {
@@ -69,40 +89,50 @@
 
         if (trackerLink && videos.length > 0) {
           
+          // Inject the AR Scene immediately behind the black loading screen
+          let assetsHTML = '';
+          let targetsHTML = '';
+
+          for (let i = 0; i < videos.length; i++) {
+            assetsHTML += `<video id="vid${i}" src="${videos[i]}" autoplay loop muted crossorigin="anonymous" playsinline></video>\n`;
+            targetsHTML += `
+              <a-entity mindar-image-target="targetIndex: ${i}" adaptive-ar="vid: #vid${i}">
+                <a-video src="#vid${i}" position="0 0 0" rotation="0 0 0"></a-video>
+              </a-entity>\n`;
+          }
+
+          // Note: uiLoading:no and uiError:no turn off MindAR's default ugly overlays so our custom one shines
+          const sceneHTML = `
+            <a-scene id="ar-scene" mindar-image="imageTargetSrc: ${trackerLink}; uiLoading: no; uiError: no;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+              <a-assets>
+                ${assetsHTML}
+              </a-assets>
+              <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+              ${targetsHTML}
+            </a-scene>
+          `;
+          
+          document.body.insertAdjacentHTML('beforeend', sceneHTML);
+
+          // LISTEN FOR AR ENGINE TO BE 100% READY
+          const sceneEl = document.getElementById('ar-scene');
+          sceneEl.addEventListener("arReady", (event) => {
+            // Engine is live! Hide the spinner and show the Start button.
+            document.getElementById('loading-view').classList.add('hidden');
+            document.getElementById('ready-view').classList.remove('hidden');
+          });
+
+          // START BUTTON LOGIC
           document.getElementById('start-btn').addEventListener('click', function() {
             document.getElementById('ui-layer').style.display = 'none';
-
-            // Dynamically generate the HTML for the assets and AR targets
-            let assetsHTML = '';
-            let targetsHTML = '';
-
+            // Force play videos in case Apple/Google tried to block autoplay
             for (let i = 0; i < videos.length; i++) {
-              // Create the hidden video asset
-              assetsHTML += `<video id="vid${i}" src="${videos[i]}" autoplay loop muted crossorigin="anonymous" playsinline></video>\n`;
-              
-              // Create the AR target that matches the image in the .mind file
-              targetsHTML += `
-                <a-entity mindar-image-target="targetIndex: ${i}" adaptive-ar="vid: #vid${i}">
-                  <a-video src="#vid${i}" position="0 0 0" rotation="0 0 0"></a-video>
-                </a-entity>\n`;
+              document.getElementById('vid' + i).play();
             }
-
-            // Build the final scene
-            const sceneHTML = `
-              <a-scene mindar-image="imageTargetSrc: ${trackerLink};" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-                <a-assets>
-                  ${assetsHTML}
-                </a-assets>
-                <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-                ${targetsHTML}
-              </a-scene>
-            `;
-            
-            document.body.insertAdjacentHTML('beforeend', sceneHTML);
           });
 
         } else {
-          document.getElementById('ui-layer').innerHTML = "<h2>Data Missing</h2><p>Please scan a valid client print.</p><div class='version-tag'>v3.0 - Dynamic</div>";
+          document.getElementById('ui-layer').innerHTML = "<h2>Data Missing</h2><p>Please scan a valid client print.</p><div class='version-tag'>v4.0 - Pre-Loader</div>";
         }
       });
     </script>
