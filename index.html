@@ -28,9 +28,7 @@
       <h2>AR Gallery Ready</h2>
       <p>Please allow camera access when prompted.</p>
       <button id="start-btn">Tap to Start AR</button>
-      
-      <!-- VERSION NUMBER -->
-      <div class="version-tag">v2.0</div>
+      <div class="version-tag">v3.0 - Dynamic</div>
     </div>
 
     <script>
@@ -60,35 +58,43 @@
       document.addEventListener("DOMContentLoaded", function() {
         const urlParams = new URLSearchParams(window.location.search);
         const trackerLink = urlParams.get('mind');
-        const video1Link = urlParams.get('v1');
-        const video2Link = urlParams.get('v2');
+        
+        // Dynamically find how many videos (v1, v2, v3, etc.) are in the URL
+        let videos = [];
+        let index = 1;
+        while (urlParams.has('v' + index)) {
+          videos.push(urlParams.get('v' + index));
+          index++;
+        }
 
-        if (trackerLink && video1Link && video2Link) {
+        if (trackerLink && videos.length > 0) {
           
           document.getElementById('start-btn').addEventListener('click', function() {
             document.getElementById('ui-layer').style.display = 'none';
 
-            // Clean scene without the glitchy masks
+            // Dynamically generate the HTML for the assets and AR targets
+            let assetsHTML = '';
+            let targetsHTML = '';
+
+            for (let i = 0; i < videos.length; i++) {
+              // Create the hidden video asset
+              assetsHTML += `<video id="vid${i}" src="${videos[i]}" autoplay loop muted crossorigin="anonymous" playsinline></video>\n`;
+              
+              // Create the AR target that matches the image in the .mind file
+              targetsHTML += `
+                <a-entity mindar-image-target="targetIndex: ${i}" adaptive-ar="vid: #vid${i}">
+                  <a-video src="#vid${i}" position="0 0 0" rotation="0 0 0"></a-video>
+                </a-entity>\n`;
+            }
+
+            // Build the final scene
             const sceneHTML = `
               <a-scene mindar-image="imageTargetSrc: ${trackerLink};" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-                
                 <a-assets>
-                  <video id="vid1" src="${video1Link}" autoplay loop muted crossorigin="anonymous" playsinline></video>
-                  <video id="vid2" src="${video2Link}" autoplay loop muted crossorigin="anonymous" playsinline></video>
+                  ${assetsHTML}
                 </a-assets>
-
                 <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-                <!-- TARGET 1 -->
-                <a-entity mindar-image-target="targetIndex: 0" adaptive-ar="vid: #vid1">
-                  <a-video src="#vid1" position="0 0 0" rotation="0 0 0"></a-video>
-                </a-entity>
-
-                <!-- TARGET 2 -->
-                <a-entity mindar-image-target="targetIndex: 1" adaptive-ar="vid: #vid2">
-                  <a-video src="#vid2" position="0 0 0" rotation="0 0 0"></a-video>
-                </a-entity>
-
+                ${targetsHTML}
               </a-scene>
             `;
             
@@ -96,7 +102,7 @@
           });
 
         } else {
-          document.getElementById('ui-layer').innerHTML = "<h2>Data Missing</h2><p>Please scan a valid client print.</p><div class='version-tag'>v2.0</div>";
+          document.getElementById('ui-layer').innerHTML = "<h2>Data Missing</h2><p>Please scan a valid client print.</p><div class='version-tag'>v3.0 - Dynamic</div>";
         }
       });
     </script>
