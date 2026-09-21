@@ -1,83 +1,126 @@
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AR Gallery Player Pro - Adaptive</title>
+    <title>AR Gallery Player Pro - Pre-Load</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
     
+    <style>
+      /* Simple full-screen loading overlay */
+      #loader {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: #000; color: #fff; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        font-family: sans-serif;
+      }
+      .hidden { display: none !important; }
+    </style>
+
     <script>
-      // 1. CUSTOM ADAPTIVE COMPONENT
-      // This script reads the video file and perfectly shapes the AR plane and masks.
+      // 1. PRE-LOAD AND SHAPE SCRIPT
+      // This forces the geometry to wait for the video dimensions before building the scene.
       AFRAME.registerComponent('adaptive-ar', {
         schema: { vid: { type: 'selector' } },
         init: function () {
           const video = this.data.vid;
-          const el = this.el;
           
-          video.addEventListener('loadedmetadata', () => {
-            const ratio = video.videoWidth / video.videoHeight;
-            // MindAR always sets target width to 1. Height is proportional.
-            const targetHeight = 1 / ratio; 
-            
-            // Resize the video plane
-            const aVideo = el.querySelector('a-video');
-            aVideo.setAttribute('width', '1');
-            aVideo.setAttribute('height', targetHeight.toString());
+          // We know the dimensions are loaded because the pre-loader guaranteed it
+          const ratio = video.videoWidth / video.videoHeight;
+          const targetHeight = 1 / ratio; // MindAR width is always 1
+          
+          // Set the video plane geometry
+          const aVideo = this.el.querySelector('a-video');
+          aVideo.setAttribute('width', '1');
+          aVideo.setAttribute('height', targetHeight.toString());
 
-            // Dynamically adjust the invisible occlusion masks to hug the exact edges
-            const top = el.querySelector('.mask-top');
-            top.setAttribute('position', `0 ${targetHeight/2 + 0.5} 0.01`);
-            top.setAttribute('width', '3');
-            top.setAttribute('height', '1');
+          // Set the invisible occlusion masks
+          const top = this.el.querySelector('.mask-top');
+          top.setAttribute('position', `0 ${targetHeight/2 + 0.5} 0.01`);
+          top.setAttribute('width', '3');
+          top.setAttribute('height', '1');
 
-            const bottom = el.querySelector('.mask-bottom');
-            bottom.setAttribute('position', `0 ${-(targetHeight/2 + 0.5)} 0.01`);
-            bottom.setAttribute('width', '3');
-            bottom.setAttribute('height', '1');
+          const bottom = this.el.querySelector('.mask-bottom');
+          bottom.setAttribute('position', `0 ${-(targetHeight/2 + 0.5)} 0.01`);
+          bottom.setAttribute('width', '3');
+          bottom.setAttribute('height', '1');
 
-            const left = el.querySelector('.mask-left');
-            left.setAttribute('position', `-1 0 0.01`);
-            left.setAttribute('width', '1');
-            left.setAttribute('height', targetHeight + 2);
+          const left = this.el.querySelector('.mask-left');
+          left.setAttribute('position', `-1 0 0.01`);
+          left.setAttribute('width', '1');
+          left.setAttribute('height', targetHeight + 2);
 
-            const right = el.querySelector('.mask-right');
-            right.setAttribute('position', `1 0 0.01`);
-            right.setAttribute('width', '1');
-            right.setAttribute('height', targetHeight + 2);
-          });
+          const right = this.el.querySelector('.mask-right');
+          right.setAttribute('position', `1 0 0.01`);
+          right.setAttribute('width', '1');
+          right.setAttribute('height', targetHeight + 2);
         }
       });
 
-      // 2. DROPBOX LINK CATCHER
+      // 2. THE PRE-LOADER MANAGER
       document.addEventListener("DOMContentLoaded", function() {
         const urlParams = new URLSearchParams(window.location.search);
         const trackerLink = urlParams.get('mind');
         const video1Link = urlParams.get('v1');
         const video2Link = urlParams.get('v2');
 
+        const vid1 = document.getElementById('vid1');
+        const vid2 = document.getElementById('vid2');
+        const sceneEl = document.querySelector('a-scene');
+        const loader = document.getElementById('loader');
+
+        let loadedCount = 0;
+
+        // Check if all data is provided via URL
         if(trackerLink && video1Link && video2Link) {
-          // Injecting the tracker with smoothing filters for stability
-          document.querySelector('a-scene').setAttribute('mindar-image', `imageTargetSrc: ${trackerLink}; filterMinCF: 0.0001; filterBeta: 0.001;`);
-          document.querySelector('#vid1').setAttribute('src', video1Link);
-          document.querySelector('#vid2').setAttribute('src', video2Link);
+          
+          // Set the tracking target
+          sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${trackerLink};`);
+          
+          // Assign the Dropbox links to the hidden video elements
+          vid1.src = video1Link;
+          vid2.src = video2Link;
+
+          // Function to check when a video has loaded its metadata
+          function checkVideoLoaded() {
+            loadedCount++;
+            if(loadedCount === 2) {
+              // Both videos have their dimensions ready. Remove loader and start AR.
+              loader.classList.add('hidden');
+              vid1.play();
+              vid2.play();
+            }
+          }
+
+          // Listen for the metadata (dimensions) to load from Dropbox
+          vid1.addEventListener('loadedmetadata', checkVideoLoaded);
+          vid2.addEventListener('loadedmetadata', checkVideoLoaded);
+
         } else {
-          alert("Awaiting QR Code Data.");
+          loader.innerHTML = "<h2>Awaiting QR Code Data.</h2><p>Please scan a valid client print.</p>";
         }
       });
     </script>
   </head>
   
   <body>
+    <!-- The Loading Screen -->
+    <div id="loader">
+      <h2>Loading AR Experience...</h2>
+      <p>Preparing assets...</p>
+    </div>
+
+    <!-- The AR Scene -->
     <a-scene color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
       
+      <!-- Hidden Video Elements (They load in the background first) -->
       <a-assets>
-        <video id="vid1" autoplay loop muted crossorigin="anonymous" playsinline></video>
-        <video id="vid2" autoplay loop muted crossorigin="anonymous" playsinline></video>
+        <video id="vid1" loop muted crossorigin="anonymous" playsinline></video>
+        <video id="vid2" loop muted crossorigin="anonymous" playsinline></video>
       </a-assets>
 
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <!-- TARGET 1 (Runs the adaptive-ar script linked to vid1) -->
+      <!-- TARGET 1 -->
       <a-entity mindar-image-target="targetIndex: 0" adaptive-ar="vid: #vid1">
         <a-video src="#vid1" position="0 0 0" rotation="0 0 0"></a-video>
         <!-- Invisible Masks -->
@@ -87,7 +130,7 @@
         <a-plane class="mask-right" material="colorWrite: false"></a-plane>
       </a-entity>
 
-      <!-- TARGET 2 (Runs the adaptive-ar script linked to vid2) -->
+      <!-- TARGET 2 -->
       <a-entity mindar-image-target="targetIndex: 1" adaptive-ar="vid: #vid2">
         <a-video src="#vid2" position="0 0 0" rotation="0 0 0"></a-video>
         <!-- Invisible Masks -->
