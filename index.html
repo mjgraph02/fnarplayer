@@ -1,140 +1,266 @@
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AR Gallery Player Pro</title>
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
-    
-    <style>
-      #ui-layer {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: #000; color: #fff; z-index: 9999;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        font-family: sans-serif; text-align: center;
-      }
-      .hidden { display: none !important; }
-      
-      button {
-        padding: 15px 30px; font-size: 18px; font-weight: bold;
-        background-color: #fff; color: #000; border: none; border-radius: 8px;
-        margin-top: 20px; cursor: pointer;
-      }
-      
-      /* Animated Loading Spinner */
-      .loader {
-        border: 6px solid #333; border-top: 6px solid #fff;
-        border-radius: 50%; width: 50px; height: 50px;
-        animation: spin 1s linear infinite; margin-bottom: 20px;
-      }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      
-      .version-tag { position: absolute; bottom: 15px; font-size: 12px; color: #666; }
-    </style>
-  </head>
-  
-  <body>
-    <!-- Full Screen UI Overlay -->
-    <div id="ui-layer">
-      
-      <!-- Phase 1: Loading Screen -->
-      <div id="loading-view">
-        <div class="loader"></div>
-        <h2>Loading AR Engine...</h2>
-        <p style="color: #aaa; font-size: 14px;">Please allow camera access if prompted.</p>
-      </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nizhali V5 — AR Engine</title>
 
-      <!-- Phase 2: Ready Screen -->
-      <div id="ready-view" class="hidden">
-        <h2>AR Gallery Ready</h2>
-        <button id="start-btn">Tap to Start AR</button>
-      </div>
-      
-      <div class="version-tag">v4.0 - Pre-Loader</div>
+    <!-- 1. Self-Hosted Core Libraries -->
+    <script src="./aframe.min.js"></script>
+    <script src="./crypto-js.min.js"></script>
+    <script type="module" src="./mindar-image-aframe.prod.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+        /* Ensure A-Frame scene and camera feed sit cleanly in the background */
+        a-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        video { object-fit: cover; }
+
+        /* Nizhali UI Overlay */
+        #nizhali-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+            padding: 24px; pointer-events: none; z-index: 9999;
+        }
+
+        .brand-pill {
+            background: rgba(15, 15, 20, 0.75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            color: #fff; padding: 8px 18px; border-radius: 30px; font-size: 13px; font-weight: 600;
+            letter-spacing: 1px; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        #status-box {
+            background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            color: #fff; padding: 16px 24px; border-radius: 16px; font-size: 15px; text-align: center;
+            max-width: 85%; border: 1px solid rgba(255,255,255,0.12);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5); transition: opacity 0.3s ease;
+        }
+
+        #unmute-btn {
+            pointer-events: auto; display: none;
+            background: rgba(255, 255, 255, 0.95); color: #111;
+            border: none; padding: 12px 24px; border-radius: 30px;
+            font-size: 14px; font-weight: 700; cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            margin-bottom: 20px; transition: transform 0.15s ease;
+        }
+        #unmute-btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+
+    <!-- Nizhali V5 HUD Overlay -->
+    <div id="nizhali-overlay">
+        <div class="brand-pill">Nizhali AR</div>
+        <div id="status-box">Initializing Nizhali V5 Engine...</div>
+        <button id="unmute-btn">🔇 Tap to Enable Sound</button>
     </div>
 
+    <!-- Dynamic AR Container (Injected once URL/Vault parameters are resolved) -->
+    <div id="ar-container"></div>
+
     <script>
-      // 1. THE ADAPTIVE SHAPE ENGINE
-      AFRAME.registerComponent('adaptive-ar', {
-        schema: { vid: { type: 'selector' } },
-        init: function () {
-          const video = this.data.vid;
-          const el = this.el;
-          
-          const applyResize = () => {
-            if (video.videoWidth === 0) return; 
-            const ratio = video.videoWidth / video.videoHeight;
-            const targetHeight = 1 / ratio; 
-            
-            const aVideo = el.querySelector('a-video');
-            aVideo.setAttribute('width', '1');
-            aVideo.setAttribute('height', targetHeight.toString());
-          };
+        // ==========================================
+        // NIZHALI V5 CORE ENGINE
+        // ==========================================
+        const statusBox = document.getElementById('status-box');
+        const unmuteBtn = document.getElementById('unmute-btn');
+        const arContainer = document.getElementById('ar-container');
 
-          video.addEventListener('loadedmetadata', applyResize);
-          if (video.readyState >= 1) applyResize();
-        }
-      });
+        let activeVideoEl = null;
+        let isGlobalMuted = true;
 
-      // 2. THE MASTER CONTROLLER
-      document.addEventListener("DOMContentLoaded", function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const trackerLink = urlParams.get('mind');
-        
-        let videos = [];
-        let index = 1;
-        while (urlParams.has('v' + index)) {
-          videos.push(urlParams.get('v' + index));
-          index++;
-        }
-
-        if (trackerLink && videos.length > 0) {
-          
-          // Inject the AR Scene immediately behind the black loading screen
-          let assetsHTML = '';
-          let targetsHTML = '';
-
-          for (let i = 0; i < videos.length; i++) {
-            assetsHTML += `<video id="vid${i}" src="${videos[i]}" autoplay loop muted crossorigin="anonymous" playsinline></video>\n`;
-            targetsHTML += `
-              <a-entity mindar-image-target="targetIndex: ${i}" adaptive-ar="vid: #vid${i}">
-                <a-video src="#vid${i}" position="0 0 0" rotation="0 0 0"></a-video>
-              </a-entity>\n`;
-          }
-
-          // Note: uiLoading:no and uiError:no turn off MindAR's default ugly overlays so our custom one shines
-          const sceneHTML = `
-            <a-scene id="ar-scene" mindar-image="imageTargetSrc: ${trackerLink}; uiLoading: no; uiError: no;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-              <a-assets>
-                ${assetsHTML}
-              </a-assets>
-              <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-              ${targetsHTML}
-            </a-scene>
-          `;
-          
-          document.body.insertAdjacentHTML('beforeend', sceneHTML);
-
-          // LISTEN FOR AR ENGINE TO BE 100% READY
-          const sceneEl = document.getElementById('ar-scene');
-          sceneEl.addEventListener("arReady", (event) => {
-            // Engine is live! Hide the spinner and show the Start button.
-            document.getElementById('loading-view').classList.add('hidden');
-            document.getElementById('ready-view').classList.remove('hidden');
-          });
-
-          // START BUTTON LOGIC
-          document.getElementById('start-btn').addEventListener('click', function() {
-            document.getElementById('ui-layer').style.display = 'none';
-            // Force play videos in case Apple/Google tried to block autoplay
-            for (let i = 0; i < videos.length; i++) {
-              document.getElementById('vid' + i).play();
+        function setStatus(msg, autoHide = false) {
+            statusBox.style.opacity = '1';
+            statusBox.innerHTML = msg;
+            if (autoHide) {
+                setTimeout(() => { statusBox.style.opacity = '0'; }, 2500);
             }
-          });
-
-        } else {
-          document.getElementById('ui-layer').innerHTML = "<h2>Data Missing</h2><p>Please scan a valid client print.</p><div class='version-tag'>v4.0 - Pre-Loader</div>";
         }
-      });
+
+        // Convert any standard Dropbox link into a direct CORS-friendly stream URL
+        function cleanDropboxUrl(url) {
+            if (!url) return '';
+            let clean = url.trim();
+            clean = clean.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+            clean = clean.replace('dropbox.com', 'dl.dropboxusercontent.com');
+            clean = clean.replace('?dl=0', '').replace('&dl=0', '').replace('?dl=1', '').replace('&dl=1', '');
+            return clean;
+        }
+
+        // Resolve configuration from either Encrypted Switchboard (?id=...&k=...) OR Direct Test URL (?mind=...&video=...)
+        async function resolveProjectConfig() {
+            const params = new URLSearchParams(window.location.search);
+            const projectId = params.get('id');
+            const secretKey = params.get('k');
+
+            // MODE A: Encrypted Vault Switchboard Mode (?id=client1&k=pass123)
+            if (projectId) {
+                setStatus('Unlocking Nizhali Vault...');
+                const res = await fetch(`./clients.json?t=${Date.now()}`);
+                if (!res.ok) throw new Error('Could not load clients.json switchboard.');
+                const db = await res.json();
+                const record = db[projectId];
+                if (!record) throw new Error(`Project ID "${projectId}" not found.`);
+
+                // Check optional expiry date (YYYY-MM-DD)
+                if (record.expires && new Date() > new Date(record.expires)) {
+                    throw new Error('This AR Memory Pass has expired.');
+                }
+
+                // If encrypted payload exists, decrypt with ?k= key
+                if (record.encrypted) {
+                    if (!secretKey) throw new Error('Missing security key (&k=) in QR link.');
+                    const bytes = CryptoJS.AES.decrypt(record.encrypted, secretKey);
+                    const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+                    if (!decryptedStr) throw new Error('Invalid security key.');
+                    return JSON.parse(decryptedStr);
+                }
+                return record;
+            }
+
+            // MODE B: Direct Testing Mode (?mind=LINK&video=LINK1,LINK2)
+            const rawMind = params.get('mind');
+            const rawVideo = params.get('video');
+            if (rawMind && rawVideo) {
+                const videoList = rawVideo.split(',').map(v => cleanDropboxUrl(decodeURIComponent(v)));
+                return {
+                    mind: cleanDropboxUrl(decodeURIComponent(rawMind)),
+                    videos: videoList
+                };
+            }
+
+            throw new Error('No AR target provided.<br><small>Use ?mind=LINK&video=LINK to test, or ?id=ID&k=KEY</small>');
+        }
+
+        // Build the A-Frame + MindAR Scene with Lazy Video Loading
+        function launchAR(config) {
+            const mindUrl = cleanDropboxUrl(config.mind);
+            const videos = (config.videos || []).map(cleanDropboxUrl);
+
+            if (!mindUrl || videos.length === 0) {
+                setStatus('Error: Missing .mind or video URLs in configuration.');
+                return;
+            }
+
+            setStatus('Loading AR Scanner...<br><small>Please allow camera access</small>');
+
+            // Wait until custom elements from mindar-image-aframe.prod.js module are registered
+            const sceneEl = document.createElement('a-scene');
+            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${mindUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.0001; filterBeta: 0.001;`);
+            sceneEl.setAttribute('color-space', 'sRGB');
+            sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights: true, alpha: true');
+            sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
+            sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+
+            const assetsEl = document.createElement('a-assets');
+            sceneEl.appendChild(assetsEl);
+
+            const cameraEl = document.createElement('a-camera');
+            cameraEl.setAttribute('position', '0 0 0');
+            cameraEl.setAttribute('look-controls', 'enabled: false');
+            sceneEl.appendChild(cameraEl);
+
+            // Create target entities for each video (Lazy Loaded on targetFound!)
+            videos.forEach((videoUrl, index) => {
+                const targetEl = document.createElement('a-entity');
+                targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
+
+                // Create hidden HTML5 video element (preload="none" saves iPhone RAM until scanned!)
+                const vidEl = document.createElement('video');
+                vidEl.id = `nizhali-vid-${index}`;
+                vidEl.src = videoUrl;
+                vidEl.setAttribute('preload', 'none');
+                vidEl.setAttribute('loop', 'true');
+                vidEl.setAttribute('muted', 'true');
+                vidEl.setAttribute('playsinline', 'true');
+                vidEl.setAttribute('webkit-playsinline', 'true');
+                vidEl.setAttribute('crossorigin', 'anonymous');
+                vidEl.muted = true;
+                assetsEl.appendChild(vidEl);
+
+                // Create A-Frame video plane
+                const planeEl = document.createElement('a-video');
+                planeEl.setAttribute('src', `#nizhali-vid-${index}`);
+                planeEl.setAttribute('position', '0 0 0');
+                planeEl.setAttribute('width', '1');
+                planeEl.setAttribute('height', '1');
+                planeEl.setAttribute('visible', 'false');
+                targetEl.appendChild(planeEl);
+
+                // Auto-adjust aspect ratio once video metadata loads
+                vidEl.addEventListener('loadedmetadata', () => {
+                    if (vidEl.videoWidth && vidEl.videoHeight) {
+                        const aspect = vidEl.videoHeight / vidEl.videoWidth;
+                        planeEl.setAttribute('width', '1');
+                        planeEl.setAttribute('height', aspect.toFixed(4));
+                    }
+                });
+
+                // When camera finds this specific target photo
+                targetEl.addEventListener('targetFound', () => {
+                    activeVideoEl = vidEl;
+                    planeEl.setAttribute('visible', 'true');
+                    vidEl.muted = isGlobalMuted;
+                    
+                    const playPromise = vidEl.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(() => {
+                            // Fallback for strict iOS autoplay: play muted first
+                            vidEl.muted = true;
+                            isGlobalMuted = true;
+                            vidEl.play();
+                        });
+                    }
+
+                    unmuteBtn.style.display = 'block';
+                    unmuteBtn.textContent = vidEl.muted ? '🔇 Tap to Enable Sound' : '🔊 Sound On';
+                    setStatus('✨ Target Locked', true);
+                });
+
+                // When camera moves away from photo
+                targetEl.addEventListener('targetLost', () => {
+                    vidEl.pause();
+                    planeEl.setAttribute('visible', 'false');
+                });
+
+                sceneEl.appendChild(targetEl);
+            });
+
+            // Scene lifecycle events
+            sceneEl.addEventListener('arReady', () => {
+                setStatus('📷 Point camera at your Nizhali print', true);
+            });
+
+            sceneEl.addEventListener('arError', () => {
+                setStatus('❌ Camera or Tracking failed to start. Please check permissions.');
+            });
+
+            arContainer.appendChild(sceneEl);
+        }
+
+        // Sound toggle button for iOS Safari / Brave
+        unmuteBtn.addEventListener('click', () => {
+            isGlobalMuted = !isGlobalMuted;
+            if (activeVideoEl) {
+                activeVideoEl.muted = isGlobalMuted;
+                if (!isGlobalMuted) activeVideoEl.play();
+            }
+            unmuteBtn.textContent = isGlobalMuted ? '🔇 Tap to Enable Sound' : '🔊 Sound On';
+        });
+
+        // Boot up once ES modules (mindar-image-aframe.prod.js) finish loading
+        window.addEventListener('load', async () => {
+            try {
+                const config = await resolveProjectConfig();
+                launchAR(config);
+            } catch (err) {
+                setStatus(`⚠️ ${err.message}`);
+            }
+        });
     </script>
-  </body>
+</body>
 </html>
