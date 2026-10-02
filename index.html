@@ -11,43 +11,87 @@
     <script type="module" src="./mindar-image-aframe.prod.js"></script>
 
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
 
-        /* Ensure A-Frame scene and camera feed sit cleanly in the background */
-        a-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        video { object-fit: cover; }
+        /* Force A-Frame canvas and MindAR camera video to fill 100% of iPhone screen */
+        a-scene {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 1;
+        }
 
         /* Nizhali UI Overlay */
         #nizhali-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column; justify-content: space-between; align-items: center;
-            padding: 24px; pointer-events: none; z-index: 9999;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            box-sizing: border-box;
+            pointer-events: none;
+            z-index: 9999;
         }
 
         .brand-pill {
-            background: rgba(15, 15, 20, 0.75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-            color: #fff; padding: 8px 18px; border-radius: 30px; font-size: 13px; font-weight: 600;
-            letter-spacing: 1px; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.15);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            background: rgba(15, 15, 20, 0.75);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border: 1px solid rgba(255,255,255,0.15);
         }
 
         #status-box {
-            background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            color: #fff; padding: 16px 24px; border-radius: 16px; font-size: 15px; text-align: center;
-            max-width: 85%; border: 1px solid rgba(255,255,255,0.12);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5); transition: opacity 0.3s ease;
+            background: rgba(15, 15, 20, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: #fff;
+            padding: 14px 22px;
+            border-radius: 16px;
+            font-size: 14px;
+            text-align: center;
+            max-width: 85%;
+            border: 1px solid rgba(255,255,255,0.12);
+            transition: opacity 0.3s ease;
         }
 
         #unmute-btn {
-            pointer-events: auto; display: none;
-            background: rgba(255, 255, 255, 0.95); color: #111;
-            border: none; padding: 12px 24px; border-radius: 30px;
-            font-size: 14px; font-weight: 700; cursor: pointer;
+            pointer-events: auto;
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            color: #111;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-            margin-bottom: 20px; transition: transform 0.15s ease;
+            margin-bottom: 25px;
         }
-        #unmute-btn:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
@@ -55,20 +99,13 @@
     <!-- Nizhali V5 HUD Overlay -->
     <div id="nizhali-overlay">
         <div class="brand-pill">Nizhali AR</div>
-        <div id="status-box">Initializing Nizhali V5 Engine...</div>
+        <div id="status-box">Initializing Nizhali V5...</div>
         <button id="unmute-btn">🔇 Tap to Enable Sound</button>
     </div>
 
-    <!-- Dynamic AR Container (Injected once URL/Vault parameters are resolved) -->
-    <div id="ar-container"></div>
-
     <script>
-        // ==========================================
-        // NIZHALI V5 CORE ENGINE
-        // ==========================================
         const statusBox = document.getElementById('status-box');
         const unmuteBtn = document.getElementById('unmute-btn');
-        const arContainer = document.getElementById('ar-container');
 
         let activeVideoEl = null;
         let isGlobalMuted = true;
@@ -81,7 +118,6 @@
             }
         }
 
-        // Convert any standard Dropbox link into a direct CORS-friendly stream URL
         function cleanDropboxUrl(url) {
             if (!url) return '';
             let clean = url.trim();
@@ -91,13 +127,11 @@
             return clean;
         }
 
-        // Resolve configuration from either Encrypted Switchboard (?id=...&k=...) OR Direct Test URL (?mind=...&video=...)
         async function resolveProjectConfig() {
             const params = new URLSearchParams(window.location.search);
             const projectId = params.get('id');
             const secretKey = params.get('k');
 
-            // MODE A: Encrypted Vault Switchboard Mode (?id=client1&k=pass123)
             if (projectId) {
                 setStatus('Unlocking Nizhali Vault...');
                 const res = await fetch(`./clients.json?t=${Date.now()}`);
@@ -106,12 +140,10 @@
                 const record = db[projectId];
                 if (!record) throw new Error(`Project ID "${projectId}" not found.`);
 
-                // Check optional expiry date (YYYY-MM-DD)
                 if (record.expires && new Date() > new Date(record.expires)) {
                     throw new Error('This AR Memory Pass has expired.');
                 }
 
-                // If encrypted payload exists, decrypt with ?k= key
                 if (record.encrypted) {
                     if (!secretKey) throw new Error('Missing security key (&k=) in QR link.');
                     const bytes = CryptoJS.AES.decrypt(record.encrypted, secretKey);
@@ -122,7 +154,6 @@
                 return record;
             }
 
-            // MODE B: Direct Testing Mode (?mind=LINK&video=LINK1,LINK2)
             const rawMind = params.get('mind');
             const rawVideo = params.get('video');
             if (rawMind && rawVideo) {
@@ -133,24 +164,18 @@
                 };
             }
 
-            throw new Error('No AR target provided.<br><small>Use ?mind=LINK&video=LINK to test, or ?id=ID&k=KEY</small>');
+            throw new Error('No AR target provided in link.');
         }
 
-        // Build the A-Frame + MindAR Scene with Lazy Video Loading
         function launchAR(config) {
             const mindUrl = cleanDropboxUrl(config.mind);
             const videos = (config.videos || []).map(cleanDropboxUrl);
 
-            if (!mindUrl || videos.length === 0) {
-                setStatus('Error: Missing .mind or video URLs in configuration.');
-                return;
-            }
+            setStatus('Starting Camera...');
 
-            setStatus('Loading AR Scanner...<br><small>Please allow camera access</small>');
-
-            // Wait until custom elements from mindar-image-aframe.prod.js module are registered
             const sceneEl = document.createElement('a-scene');
-            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${mindUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.0001; filterBeta: 0.001;`);
+            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${mindUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes;`);
+            sceneEl.setAttribute('embedded', '');
             sceneEl.setAttribute('color-space', 'sRGB');
             sceneEl.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights: true, alpha: true');
             sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
@@ -164,34 +189,34 @@
             cameraEl.setAttribute('look-controls', 'enabled: false');
             sceneEl.appendChild(cameraEl);
 
-            // Create target entities for each video (Lazy Loaded on targetFound!)
             videos.forEach((videoUrl, index) => {
+                // Create HTML5 video element
+                const vidEl = document.createElement('video');
+                vidEl.id = `nizhali-vid-${index}`;
+                vidEl.setAttribute('preload', 'metadata');
+                vidEl.setAttribute('loop', '');
+                vidEl.setAttribute('muted', '');
+                vidEl.setAttribute('playsinline', '');
+                vidEl.setAttribute('webkit-playsinline', '');
+                vidEl.setAttribute('crossorigin', 'anonymous');
+                vidEl.muted = true;
+                vidEl.playsInline = true;
+                vidEl.src = videoUrl;
+                assetsEl.appendChild(vidEl);
+
+                // Create Target Entity
                 const targetEl = document.createElement('a-entity');
                 targetEl.setAttribute('mindar-image-target', `targetIndex: ${index}`);
 
-                // Create hidden HTML5 video element (preload="none" saves iPhone RAM until scanned!)
-                const vidEl = document.createElement('video');
-                vidEl.id = `nizhali-vid-${index}`;
-                vidEl.src = videoUrl;
-                vidEl.setAttribute('preload', 'none');
-                vidEl.setAttribute('loop', 'true');
-                vidEl.setAttribute('muted', 'true');
-                vidEl.setAttribute('playsinline', 'true');
-                vidEl.setAttribute('webkit-playsinline', 'true');
-                vidEl.setAttribute('crossorigin', 'anonymous');
-                vidEl.muted = true;
-                assetsEl.appendChild(vidEl);
-
-                // Create A-Frame video plane
+                // Create Video Plane inside Target
                 const planeEl = document.createElement('a-video');
                 planeEl.setAttribute('src', `#nizhali-vid-${index}`);
                 planeEl.setAttribute('position', '0 0 0');
                 planeEl.setAttribute('width', '1');
                 planeEl.setAttribute('height', '1');
-                planeEl.setAttribute('visible', 'false');
                 targetEl.appendChild(planeEl);
 
-                // Auto-adjust aspect ratio once video metadata loads
+                // Adjust aspect ratio automatically when video dimensions load
                 vidEl.addEventListener('loadedmetadata', () => {
                     if (vidEl.videoWidth && vidEl.videoHeight) {
                         const aspect = vidEl.videoHeight / vidEl.videoWidth;
@@ -200,49 +225,39 @@
                     }
                 });
 
-                // When camera finds this specific target photo
                 targetEl.addEventListener('targetFound', () => {
+                    setStatus('✨ Target Found! Playing video...', true);
                     activeVideoEl = vidEl;
-                    planeEl.setAttribute('visible', 'true');
                     vidEl.muted = isGlobalMuted;
-                    
-                    const playPromise = vidEl.play();
-                    if (playPromise !== undefined) {
-                        playPromise.catch(() => {
-                            // Fallback for strict iOS autoplay: play muted first
-                            vidEl.muted = true;
-                            isGlobalMuted = true;
-                            vidEl.play();
-                        });
-                    }
-
+                    vidEl.play().catch(() => {
+                        vidEl.muted = true;
+                        isGlobalMuted = true;
+                        vidEl.play();
+                    });
                     unmuteBtn.style.display = 'block';
                     unmuteBtn.textContent = vidEl.muted ? '🔇 Tap to Enable Sound' : '🔊 Sound On';
-                    setStatus('✨ Target Locked', true);
                 });
 
-                // When camera moves away from photo
                 targetEl.addEventListener('targetLost', () => {
+                    setStatus('📷 Point camera at your print', true);
                     vidEl.pause();
-                    planeEl.setAttribute('visible', 'false');
                 });
 
                 sceneEl.appendChild(targetEl);
             });
 
-            // Scene lifecycle events
             sceneEl.addEventListener('arReady', () => {
-                setStatus('📷 Point camera at your Nizhali print', true);
+                setStatus('📷 Ready! Point camera at your print', true);
             });
 
             sceneEl.addEventListener('arError', () => {
-                setStatus('❌ Camera or Tracking failed to start. Please check permissions.');
+                setStatus('❌ Failed to load .mind file or camera.');
             });
 
-            arContainer.appendChild(sceneEl);
+            // Append directly to body so MindAR fullscreen sizing works on iOS
+            document.body.appendChild(sceneEl);
         }
 
-        // Sound toggle button for iOS Safari / Brave
         unmuteBtn.addEventListener('click', () => {
             isGlobalMuted = !isGlobalMuted;
             if (activeVideoEl) {
@@ -252,7 +267,6 @@
             unmuteBtn.textContent = isGlobalMuted ? '🔇 Tap to Enable Sound' : '🔊 Sound On';
         });
 
-        // Boot up once ES modules (mindar-image-aframe.prod.js) finish loading
         window.addEventListener('load', async () => {
             try {
                 const config = await resolveProjectConfig();
