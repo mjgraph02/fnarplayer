@@ -128,9 +128,9 @@
                 sceneWrapper.innerHTML = `
                     <a-scene
                         id="ar-scene"
-                        mindar-image="imageTargetSrc: ${localMindBlobUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes;"
+                        mindar-image="imageTargetSrc: ${localMindBlobUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.1; filterBeta: 10000; warmupTolerance: 2; missTolerance: 5;"
                         color-space="sRGB"
-                        renderer="colorManagement: true, physicallyCorrectLights: true, alpha: true"
+                        renderer="colorManagement: true, physicallyCorrectLights: true, alpha: true, antialias: true, powerPreference: high-performance"
                         vr-mode-ui="enabled: false"
                         device-orientation-permission-ui="enabled: false"
                         embedded>
