@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Nizhali V5</title>
 
-    <!-- Load A-Frame first -->
+    <!-- 1. Self-Hosted Core Libraries -->
     <script src="./aframe.min.js"></script>
+    <script src="./crypto-js.min.js"></script>
+    <script type="module" src="./mindar-image-aframe.prod.js"></script>
 
     <style>
         html, body {
@@ -14,27 +16,9 @@
             padding: 0;
             width: 100%;
             height: 100%;
+            position: relative;
             overflow: hidden;
-            background: transparent !important;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-
-        a-scene {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-        }
-
-        body > video {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            object-fit: cover !important;
-            z-index: -2 !important;
         }
 
         #status {
@@ -51,7 +35,7 @@
             z-index: 9999;
             pointer-events: none;
             text-align: center;
-            max-width: 90%;
+            white-space: nowrap;
         }
 
         #unmute-btn {
@@ -74,15 +58,30 @@
 </head>
 <body>
 
-    <div id="status">1/3 Loading MindAR Engine...</div>
+    <div id="status">Loading Nizhali Engine...</div>
     <button id="unmute-btn">🔇 Tap for Sound</button>
 
+    <!-- Static A-Frame Scene (Just like V4!) with autoStart: false until targets are ready -->
+    <a-scene
+        id="ar-scene"
+        mindar-image="autoStart: false; uiLoading: no; uiError: no; uiScanning: yes;"
+        color-space="sRGB"
+        renderer="colorManagement: true, physicallyCorrectLights: true"
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false">
+
+        <a-assets id="ar-assets"></a-assets>
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    </a-scene>
+
     <script type="module">
-        // Force MindAR to register with A-Frame BEFORE we build the scene
         import './mindar-image-aframe.prod.js';
 
         const statusEl = document.getElementById('status');
         const unmuteBtn = document.getElementById('unmute-btn');
+        const sceneEl = document.getElementById('ar-scene');
+        const assetsEl = document.getElementById('ar-assets');
+
         let activeVideo = null;
         let isMuted = true;
 
@@ -94,12 +93,7 @@
                 .replace(/[?&]dl=[01]/g, '');
         }
 
-        async function startApp() {
-            // Wait until A-Frame confirms mindar-image is registered
-            while (!AFRAME.systems['mindar-image-system'] && !AFRAME.components['mindar-image']) {
-                await new Promise(r => setTimeout(r, 50));
-            }
-
+        function initTargets() {
             const params = new URLSearchParams(window.location.search);
             const mindUrl = cleanDropbox(params.get('mind'));
             const videoParam = params.get('video');
@@ -109,25 +103,9 @@
                 return;
             }
 
-            statusEl.textContent = '2/3 Downloading .mind & starting camera...';
-
             const videos = videoParam.split(',').map(cleanDropbox);
 
-            const scene = document.createElement('a-scene');
-            scene.setAttribute('mindar-image', `imageTargetSrc: ${mindUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes;`);
-            scene.setAttribute('color-space', 'sRGB');
-            scene.setAttribute('renderer', 'colorManagement: true, physicallyCorrectLights: true, alpha: true');
-            scene.setAttribute('vr-mode-ui', 'enabled: false');
-            scene.setAttribute('device-orientation-permission-ui', 'enabled: false');
-
-            const assets = document.createElement('a-assets');
-            scene.appendChild(assets);
-
-            const camera = document.createElement('a-camera');
-            camera.setAttribute('position', '0 0 0');
-            camera.setAttribute('look-controls', 'enabled: false');
-            scene.appendChild(camera);
-
+            // 1. Build video assets & target entities BEFORE starting MindAR
             videos.forEach((url, index) => {
                 const vid = document.createElement('video');
                 vid.id = `vid-${index}`;
@@ -139,8 +117,7 @@
                 vid.setAttribute('playsinline', '');
                 vid.setAttribute('webkit-playsinline', '');
                 vid.setAttribute('preload', 'auto');
-                vid.load();
-                assets.appendChild(vid);
+                assetsEl.appendChild(vid);
 
                 const target = document.createElement('a-entity');
                 target.setAttribute('mindar-image-target', `targetIndex: ${index}`);
@@ -159,35 +136,50 @@
                 });
 
                 target.addEventListener('targetFound', () => {
-                    statusEl.textContent = '🎯 TARGET FOUND! Playing video...';
+                    statusEl.textContent = '🎯 TARGET FOUND! Playing...';
                     activeVideo = vid;
                     vid.muted = isMuted;
-                    vid.play().catch(err => {
-                        statusEl.textContent = '⚠️ Tap screen to play video';
+                    vid.play().catch(() => {
                         vid.muted = true;
+                        isMuted = true;
                         vid.play();
                     });
                     unmuteBtn.style.display = 'block';
                 });
 
                 target.addEventListener('targetLost', () => {
-                    statusEl.textContent = '👀 Target lost — scan image again';
+                    statusEl.textContent = '📷 Scan your image';
                     vid.pause();
                 });
 
-                scene.appendChild(target);
+                sceneEl.appendChild(target);
             });
 
-            scene.addEventListener('arReady', () => {
-                statusEl.textContent = '✅ AR Ready! Scan your image';
-            });
+            // 2. Set the .mind URL on the scene and start MindAR once A-Frame is ready
+            sceneEl.setAttribute('mindar-image', `imageTargetSrc: ${mindUrl}; autoStart: false; uiLoading: no; uiError: no; uiScanning: yes;`);
 
-            scene.addEventListener('arError', (e) => {
-                statusEl.textContent = '❌ AR Error: Could not load .mind file';
-            });
+            const startMindAR = () => {
+                statusEl.textContent = 'Starting Camera & Tracker...';
+                const arSystem = sceneEl.systems['mindar-image-system'];
+                if (arSystem) {
+                    arSystem.start();
+                }
+            };
 
-            document.body.appendChild(scene);
+            if (sceneEl.hasLoaded) {
+                startMindAR();
+            } else {
+                sceneEl.addEventListener('loaded', startMindAR);
+            }
         }
+
+        sceneEl.addEventListener('arReady', () => {
+            statusEl.textContent = '✅ AR Ready! Scan your image';
+        });
+
+        sceneEl.addEventListener('arError', () => {
+            statusEl.textContent = '❌ Error starting AR';
+        });
 
         unmuteBtn.addEventListener('click', () => {
             isMuted = !isMuted;
@@ -198,7 +190,7 @@
             unmuteBtn.textContent = isMuted ? '🔇 Tap for Sound' : '🔊 Sound On';
         });
 
-        startApp();
+        initTargets();
     </script>
 </body>
 </html>
