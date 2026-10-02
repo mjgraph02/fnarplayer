@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Nizhali V5</title>
 
+    <!-- Load A-Frame first -->
     <script src="./aframe.min.js"></script>
-    <script type="module" src="./mindar-image-aframe.prod.js"></script>
 
     <style>
         html, body {
@@ -19,7 +19,6 @@
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        /* Fullscreen A-Frame 3D Layer */
         a-scene {
             position: fixed !important;
             top: 0 !important;
@@ -28,7 +27,6 @@
             height: 100vh !important;
         }
 
-        /* Fullscreen MindAR Camera Video Feed */
         body > video {
             position: fixed !important;
             top: 0 !important;
@@ -39,21 +37,21 @@
             z-index: -2 !important;
         }
 
-        /* Minimal Status & Sound Button */
         #status {
             position: fixed;
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.75);
-            color: #fff;
-            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff88;
+            padding: 10px 18px;
             border-radius: 20px;
-            font-size: 14px;
+            font-size: 13px;
+            font-weight: 600;
             z-index: 9999;
             pointer-events: none;
-            transition: opacity 0.3s;
-            white-space: nowrap;
+            text-align: center;
+            max-width: 90%;
         }
 
         #unmute-btn {
@@ -76,10 +74,13 @@
 </head>
 <body>
 
-    <div id="status">Starting Camera...</div>
+    <div id="status">1/3 Loading MindAR Engine...</div>
     <button id="unmute-btn">🔇 Tap for Sound</button>
 
     <script type="module">
+        // Force MindAR to register with A-Frame BEFORE we build the scene
+        import './mindar-image-aframe.prod.js';
+
         const statusEl = document.getElementById('status');
         const unmuteBtn = document.getElementById('unmute-btn');
         let activeVideo = null;
@@ -93,13 +94,23 @@
                 .replace(/[?&]dl=[01]/g, '');
         }
 
-        const params = new URLSearchParams(window.location.search);
-        const mindUrl = cleanDropbox(params.get('mind'));
-        const videoParam = params.get('video');
+        async function startApp() {
+            // Wait until A-Frame confirms mindar-image is registered
+            while (!AFRAME.systems['mindar-image-system'] && !AFRAME.components['mindar-image']) {
+                await new Promise(r => setTimeout(r, 50));
+            }
 
-        if (!mindUrl || !videoParam) {
-            statusEl.textContent = 'Missing ?mind= or ?video= link';
-        } else {
+            const params = new URLSearchParams(window.location.search);
+            const mindUrl = cleanDropbox(params.get('mind'));
+            const videoParam = params.get('video');
+
+            if (!mindUrl || !videoParam) {
+                statusEl.textContent = '❌ Missing ?mind= or ?video= in URL';
+                return;
+            }
+
+            statusEl.textContent = '2/3 Downloading .mind & starting camera...';
+
             const videos = videoParam.split(',').map(cleanDropbox);
 
             const scene = document.createElement('a-scene');
@@ -124,10 +135,11 @@
                 vid.loop = true;
                 vid.muted = true;
                 vid.playsInline = true;
-                vid. crossOrigin = 'anonymous';
+                vid.crossOrigin = 'anonymous';
                 vid.setAttribute('playsinline', '');
                 vid.setAttribute('webkit-playsinline', '');
                 vid.setAttribute('preload', 'auto');
+                vid.load();
                 assets.appendChild(vid);
 
                 const target = document.createElement('a-entity');
@@ -135,6 +147,7 @@
 
                 const plane = document.createElement('a-video');
                 plane.setAttribute('src', `#vid-${index}`);
+                plane.setAttribute('position', '0 0 0');
                 plane.setAttribute('width', '1');
                 plane.setAttribute('height', '1');
                 target.appendChild(plane);
@@ -146,18 +159,19 @@
                 });
 
                 target.addEventListener('targetFound', () => {
+                    statusEl.textContent = '🎯 TARGET FOUND! Playing video...';
                     activeVideo = vid;
                     vid.muted = isMuted;
-                    vid.play().catch(() => {
+                    vid.play().catch(err => {
+                        statusEl.textContent = '⚠️ Tap screen to play video';
                         vid.muted = true;
-                        isMuted = true;
                         vid.play();
                     });
                     unmuteBtn.style.display = 'block';
-                    statusEl.style.opacity = '0';
                 });
 
                 target.addEventListener('targetLost', () => {
+                    statusEl.textContent = '👀 Target lost — scan image again';
                     vid.pause();
                 });
 
@@ -165,12 +179,11 @@
             });
 
             scene.addEventListener('arReady', () => {
-                statusEl.textContent = 'Point camera at print';
-                setTimeout(() => { statusEl.style.opacity = '0'; }, 2500);
+                statusEl.textContent = '✅ AR Ready! Scan your image';
             });
 
-            scene.addEventListener('arError', () => {
-                statusEl.textContent = 'Error loading AR target or camera';
+            scene.addEventListener('arError', (e) => {
+                statusEl.textContent = '❌ AR Error: Could not load .mind file';
             });
 
             document.body.appendChild(scene);
@@ -184,6 +197,8 @@
             }
             unmuteBtn.textContent = isMuted ? '🔇 Tap for Sound' : '🔊 Sound On';
         });
+
+        startApp();
     </script>
 </body>
 </html>
