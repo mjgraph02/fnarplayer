@@ -35,6 +35,7 @@
             pointer-events: none;
             text-align: center;
             max-width: 90%;
+            transition: opacity 0.3s ease;
         }
 
         #unmute-btn {
@@ -88,8 +89,8 @@
                     return;
                 }
 
-                // Verify the .mind file actually downloads from Dropbox before starting
-                statusEl.textContent = '1/3 Verifying .mind file from Dropbox...';
+                // Verify and pre-download .mind file into local memory blob
+                statusEl.textContent = '1/3 Loading .mind target...';
                 const checkRes = await fetch(mindUrl);
                 if (!checkRes.ok) {
                     statusEl.textContent = `❌ Dropbox blocked .mind (${checkRes.status})`;
@@ -101,13 +102,11 @@
                     return;
                 }
 
-                // Create local Blob URL from downloaded .mind buffer so MindAR loads it instantaneously
                 const localMindBlobUrl = URL.createObjectURL(new Blob([mindBuffer]));
-                statusEl.textContent = `2/3 Loaded .mind (${(mindBuffer.byteLength / 1024).toFixed(0)} KB). Starting Camera...`;
+                statusEl.textContent = `2/3 Starting Camera...`;
 
                 const videos = videoParam.split(',').map(cleanDropbox);
 
-                // Build A-Frame HTML string AFTER MindAR component is registered
                 let assetsHtml = '';
                 let targetsHtml = '';
 
@@ -122,15 +121,18 @@
                     `;
                 });
 
+                // 2.0x preserves Full-HD Retina sharpness for recording while avoiding 3x 4K GPU lag
+                window.devicePixelRatio = Math.min(window.devicePixelRatio, 2.0);
+
                 const sceneWrapper = document.createElement('div');
                 sceneWrapper.style.width = '100%';
                 sceneWrapper.style.height = '100%';
                 sceneWrapper.innerHTML = `
                     <a-scene
                         id="ar-scene"
-                        mindar-image="imageTargetSrc: ${localMindBlobUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.1; filterBeta: 10000; warmupTolerance: 2; missTolerance: 5;"
+                        mindar-image="imageTargetSrc: ${localMindBlobUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 10; filterBeta: 10000; warmupTolerance: 1; missTolerance: 5;"
                         color-space="sRGB"
-                        renderer="colorManagement: true, physicallyCorrectLights: true, alpha: true, antialias: true, powerPreference: high-performance"
+                        renderer="colorManagement: true, physicallyCorrectLights: false, alpha: true, antialias: true, powerPreference: high-performance"
                         vr-mode-ui="enabled: false"
                         device-orientation-permission-ui="enabled: false"
                         embedded>
@@ -156,7 +158,8 @@
                     });
 
                     target.addEventListener('targetFound', () => {
-                        statusEl.textContent = '🎯 TARGET FOUND! Playing video...';
+                        statusEl.textContent = '🎯 Target Locked';
+                        setTimeout(() => { statusEl.style.opacity = '0'; }, 1500);
                         activeVideo = vid;
                         vid.muted = isMuted;
                         vid.play().catch(() => {
@@ -168,17 +171,18 @@
                     });
 
                     target.addEventListener('targetLost', () => {
-                        statusEl.textContent = '👀 Target lost — scan image again';
+                        statusEl.style.opacity = '1';
+                        statusEl.textContent = '📷 Scan image';
                         vid.pause();
                     });
                 });
 
                 sceneEl.addEventListener('arReady', () => {
-                    statusEl.textContent = `✅ Ready (${ (mindBuffer.byteLength / 1024).toFixed(0) }KB .mind)! Scan image`;
+                    statusEl.textContent = `✅ Ready! Scan image`;
                 });
 
                 sceneEl.addEventListener('arError', () => {
-                    statusEl.textContent = '❌ MindAR failed to parse .mind file';
+                    statusEl.textContent = '❌ MindAR failed to start';
                 });
 
             } catch (err) {
