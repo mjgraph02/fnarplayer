@@ -33,7 +33,7 @@
         /* Buttons & Inputs */
         .btn { background: #222430; color: #f4f4f5; border: 1px solid #323546; padding: 8px 11px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; width: 100%; margin-bottom: 6px; text-align: left; transition: 0.15s; display: flex; align-items: center; gap: 8px; }
         .btn:hover:not(:disabled) { background: #2d3040; border-color: #7c3aed; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
         .btn-compile { background: #065f46; border-color: #10b981; color: #ecfdf5; justify-content: center; margin-top: 8px; }
         .btn-compile:hover:not(:disabled) { background: #047857; }
         .btn-primary { background: #7c3aed; border-color: #8b5cf6; justify-content: center; font-size: 13px; padding: 11px; }
@@ -44,18 +44,23 @@
         .progress-wrap { width: 100%; height: 6px; background: #0e0f14; border-radius: 4px; overflow: hidden; margin-top: 6px; display: none; }
         .progress-bar { width: 0%; height: 100%; background: #10b981; transition: width 0.15s; }
 
-        .layer-item { padding: 9px 11px; border-radius: 7px; background: #121318; border: 1px solid #252733; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 12px; transition: 0.1s; }
+        .layer-item { padding: 8px 10px; border-radius: 7px; background: #121318; border: 1px solid #252733; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 12px; transition: 0.1s; }
         .layer-item:hover { border-color: #4b5563; }
         .layer-item.active { border-color: #8b5cf6; background: #231d38; font-weight: 600; color: #fff; }
+        .layer-focus-btn { background: #272935; border: 1px solid #3f3f56; color: #cbd5e1; border-radius: 5px; padding: 2px 6px; font-size: 11px; cursor: pointer; margin-left: 6px; }
+        .layer-focus-btn:hover { background: #7c3aed; color: #fff; border-color: #8b5cf6; }
 
         label { display: block; font-size: 11px; color: #a1a1aa; margin: 7px 0 3px; }
         input[type="text"], input[type="number"] { width: 100%; padding: 7px 9px; background: #0e0f14; border: 1px solid #2c2e3d; color: #fff; border-radius: 6px; font-size: 12px; user-select: text; }
         input[type="text"]:focus, input[type="number"]:focus { outline: none; border-color: #8b5cf6; }
         input[type="range"] { width: 100%; accent-color: #8b5cf6; cursor: pointer; }
         .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 
         /* Center Spark AR 3D Viewport */
         #viewport-container { position: relative; width: 100%; height: 100vh; background: #0b0c10; overflow: hidden; }
+        #viewport-container.space-pan { cursor: grab !important; }
+        #viewport-container.space-pan:active { cursor: grabbing !important; }
         #webgl-canvas { width: 100%; height: 100%; display: block; }
 
         .top-toolbar {
@@ -64,27 +69,31 @@
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 14px;
-            background: rgba(24, 25, 32, 0.9);
+            gap: 10px;
+            background: rgba(24, 25, 32, 0.92);
             backdrop-filter: blur(10px);
             border: 1px solid #2e303e;
             padding: 6px 12px;
             border-radius: 10px;
             z-index: 10;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+            white-space: nowrap;
         }
         .tool-group { display: flex; gap: 4px; align-items: center; }
         .tool-divider { width: 1px; height: 20px; background: #2e303e; }
-        .tool-btn { background: transparent; color: #a1a1aa; border: 1px solid transparent; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.15s; }
-        .tool-btn:hover { color: #fff; background: #272935; }
+        .tool-btn { background: transparent; color: #a1a1aa; border: 1px solid transparent; padding: 5px 9px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.15s; }
+        .tool-btn:hover:not(:disabled) { color: #fff; background: #272935; }
+        .tool-btn:disabled { opacity: 0.35; cursor: not-allowed; }
         .tool-btn.active { background: #7c3aed; color: #fff; }
+        .tool-btn.highlight { color: #34d399; border-color: rgba(16, 185, 129, 0.3); }
+        .tool-btn.highlight:hover { background: rgba(16, 185, 129, 0.15); }
 
         .viewport-footer {
             position: absolute;
             bottom: 14px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(15, 16, 22, 0.85);
+            background: rgba(15, 16, 22, 0.88);
             border: 1px solid #272935;
             padding: 6px 14px;
             border-radius: 20px;
@@ -150,7 +159,7 @@
         <button class="btn" onclick="addLayer('image')">🖼️ + Add Transparent PNG</button>
         <button class="btn" onclick="addLayer('glb')">🧊 + Add 3D Model (.glb)</button>
 
-        <h3>3. Scene Hierarchy</h3>
+        <h3>3. Scene Hierarchy <small style="color:#666; font-weight:normal;">(Click 🎯 to find)</small></h3>
         <div id="layerList">
             <div style="color:#666; font-size:11px; padding:6px 0;">No layers added yet.</div>
         </div>
@@ -159,16 +168,30 @@
     <!-- 2. CENTER PANEL: SPARK AR 3D VIEWPORT -->
     <div id="viewport-container">
         <div class="top-toolbar">
+            <!-- Undo / Redo Group -->
             <div class="tool-group">
-                <button class="tool-btn active" id="gizmo-translate" onclick="setGizmoMode('translate')" title="Shortcut: W">✥ Move (W)</button>
-                <button class="tool-btn" id="gizmo-rotate" onclick="setGizmoMode('rotate')" title="Shortcut: E">↻ Rotate (E)</button>
-                <button class="tool-btn" id="gizmo-scale" onclick="setGizmoMode('scale')" title="Shortcut: R">⤢ Scale (R)</button>
+                <button class="tool-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z / Cmd+Z)">↩ Undo</button>
+                <button class="tool-btn" id="btn-redo" onclick="redo()" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
             </div>
             <div class="tool-divider"></div>
+            <!-- Gizmo Modes -->
             <div class="tool-group">
-                <button class="tool-btn" onclick="setCameraPreset('front')">Front 2D</button>
+                <button class="tool-btn active" id="gizmo-translate" onclick="setGizmoMode('translate')" title="Move Tool (W)">✥ Move (W)</button>
+                <button class="tool-btn" id="gizmo-rotate" onclick="setGizmoMode('rotate')" title="Rotate Tool (E)">↻ Rotate (E)</button>
+                <button class="tool-btn" id="gizmo-scale" onclick="setGizmoMode('scale')" title="Scale Tool (R)">⤢ Scale (R)</button>
+            </div>
+            <div class="tool-divider"></div>
+            <!-- Focus Selected & Global Video Play/Pause -->
+            <div class="tool-group">
+                <button class="tool-btn highlight" onclick="focusSelectedLayer()" title="Move Camera to Selected Object (Shortcut: F)">🎯 Focus (F)</button>
+                <button class="tool-btn" id="globalPlayPauseBtn" onclick="toggleAllVideos()" title="Play/Pause All Videos in Scene">⏸ Pause Videos</button>
+            </div>
+            <div class="tool-divider"></div>
+            <!-- Camera Preset Angles -->
+            <div class="tool-group">
+                <button class="tool-btn" onclick="setCameraPreset('front')">Front</button>
                 <button class="tool-btn" onclick="setCameraPreset('perspective')">3D Orbit</button>
-                <button class="tool-btn" onclick="setCameraPreset('side')">Side (Z-Depth)</button>
+                <button class="tool-btn" onclick="setCameraPreset('side')">Side (Z)</button>
                 <button class="tool-btn" onclick="setCameraPreset('top')">Top</button>
             </div>
         </div>
@@ -176,7 +199,7 @@
         <div id="toast" class="status-toast"></div>
 
         <div class="viewport-footer">
-            🖱️ <b>Click Object:</b> Select & Move Arrows | <b>Left-Drag Space:</b> Orbit 360° | <b>Right-Drag:</b> Pan | <b>Scroll:</b> Zoom
+            🖐️ <b>Hold Spacebar + Drag:</b> Pan Left/Right/Up/Down | <b>Drag:</b> Orbit 360° | <b>Press F:</b> Find Selected Object | <b>Ctrl+Z:</b> Undo
         </div>
 
         <canvas id="webgl-canvas"></canvas>
@@ -186,6 +209,7 @@
     <div class="panel panel-right">
         <div class="brand-header">
             <span class="brand-title">Inspector</span>
+            <button class="layer-focus-btn" id="inspectorFocusBtn" style="display:none;" onclick="focusSelectedLayer()">🎯 Find in Viewport (F)</button>
         </div>
 
         <div id="inspectorEmpty" style="color:#71717a; font-size:12px; line-height:1.6;">
@@ -194,7 +218,7 @@
 
         <div id="inspectorControls" style="display:none;">
             <label>Layer Name</label>
-            <input type="text" id="inpName" oninput="syncUIFromInspector()">
+            <input type="text" id="inpName" oninput="syncUIFromInspector()" onchange="saveHistoryState()">
 
             <div class="step-card" style="margin-top:8px;">
                 <label style="color:#34d399; margin-top:0;">Option 1: Paste Dropbox Link (Auto-Previews Live!)</label>
@@ -204,36 +228,45 @@
                 <input type="file" id="inpLocalFile" style="font-size:11px; width:100%;" onchange="handleLocalFile(event)">
             </div>
 
+            <!-- Video Playback Controls (Shown when selected layer is Video or Chroma) -->
+            <div id="videoTransportBox" class="step-card" style="display:none; border-color:#3b82f6;">
+                <label style="color:#60a5fa; margin-top:0; margin-bottom:6px;">🎬 Video Playback Controls</label>
+                <div class="row-2">
+                    <button class="btn" id="layerPlayPauseBtn" style="justify-content:center; margin:0;" onclick="toggleSelectedVideo()">⏸ Pause</button>
+                    <button class="btn" style="justify-content:center; margin:0;" onclick="restartSelectedVideo()">⏮ Restart</button>
+                </div>
+            </div>
+
             <h3>Position (X, Y, Z-Depth Popout)</h3>
             <div class="row-3">
-                <div><label style="color:#f87171;">X (Red)</label><input type="number" id="posX" step="0.02" oninput="syncTransformFromInputs()"></div>
-                <div><label style="color:#4ade80;">Y (Green)</label><input type="number" id="posY" step="0.02" oninput="syncTransformFromInputs()"></div>
-                <div><label style="color:#60a5fa;">Z (Depth)</label><input type="number" id="posZ" step="0.02" oninput="syncTransformFromInputs()"></div>
+                <div><label style="color:#f87171;">X (Red)</label><input type="number" id="posX" step="0.02" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label style="color:#4ade80;">Y (Green)</label><input type="number" id="posY" step="0.02" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label style="color:#60a5fa;">Z (Depth)</label><input type="number" id="posZ" step="0.02" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
             </div>
 
             <h3>Scale (Size Multiplier)</h3>
             <div class="row-3">
-                <div><label>Scale X</label><input type="number" id="scaleX" step="0.05" oninput="syncTransformFromInputs()"></div>
-                <div><label>Scale Y</label><input type="number" id="scaleY" step="0.05" oninput="syncTransformFromInputs()"></div>
-                <div><label>Scale Z</label><input type="number" id="scaleZ" step="0.05" oninput="syncTransformFromInputs()"></div>
+                <div><label>Scale X</label><input type="number" id="scaleX" step="0.05" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label>Scale Y</label><input type="number" id="scaleY" step="0.05" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label>Scale Z</label><input type="number" id="scaleZ" step="0.05" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
             </div>
 
             <h3>Rotation (Degrees)</h3>
             <div class="row-3">
-                <div><label>Rot X</label><input type="number" id="rotX" step="5" oninput="syncTransformFromInputs()"></div>
-                <div><label>Rot Y</label><input type="number" id="rotY" step="5" oninput="syncTransformFromInputs()"></div>
-                <div><label>Rot Z</label><input type="number" id="rotZ" step="5" oninput="syncTransformFromInputs()"></div>
+                <div><label>Rot X</label><input type="number" id="rotX" step="5" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label>Rot Y</label><input type="number" id="rotY" step="5" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label>Rot Z</label><input type="number" id="rotZ" step="5" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
             </div>
 
             <!-- Chroma Key Settings -->
             <div id="chromaBox" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #272935;">
                 <h3 style="margin-top:0; color:#34d399;">Chroma Key Green Screen</h3>
                 <label>Key Color</label>
-                <input type="color" id="chromaColor" value="#00ff00" style="width:100%; height:30px; border:none; background:none; cursor:pointer;" oninput="syncChromaFromInputs()">
+                <input type="color" id="chromaColor" value="#00ff00" style="width:100%; height:30px; border:none; background:none; cursor:pointer;" oninput="syncChromaFromInputs()" onchange="saveHistoryState()">
                 <label>Similarity / Cutoff (<span id="simVal">0.38</span>)</label>
-                <input type="range" id="chromaSim" min="0.05" max="0.8" step="0.01" value="0.38" oninput="syncChromaFromInputs()">
+                <input type="range" id="chromaSim" min="0.05" max="0.8" step="0.01" value="0.38" oninput="syncChromaFromInputs()" onchange="saveHistoryState()">
                 <label>Smoothness (<span id="smoothVal">0.08</span>)</label>
-                <input type="range" id="chromaSmooth" min="0.01" max="0.3" step="0.01" value="0.08" oninput="syncChromaFromInputs()">
+                <input type="range" id="chromaSmooth" min="0.01" max="0.3" step="0.01" value="0.08" oninput="syncChromaFromInputs()" onchange="saveHistoryState()">
             </div>
 
             <button class="btn btn-danger" onclick="deleteSelectedLayer()">🗑️ Delete Layer</button>
@@ -269,7 +302,7 @@
         dirLight.position.set(2, 2, 4);
         scene.add(dirLight);
 
-        const gridHelper = new THREE.GridHelper(3, 30, 0x3b3e52, 0x1e202b);
+        const gridHelper = new THREE.GridHelper(4, 40, 0x3b3e52, 0x1e202b);
         gridHelper.rotation.x = Math.PI / 2;
         gridHelper.position.z = -0.005;
         scene.add(gridHelper);
@@ -294,6 +327,7 @@
         const orbit = new THREE.OrbitControls(camera, renderer.domElement);
         orbit.enableDamping = true;
         orbit.dampingFactor = 0.08;
+        orbit.screenSpacePanning = true; // Ensures panning moves cleanly Left/Right/Up/Down relative to screen!
 
         const transformControl = new THREE.TransformControls(camera, renderer.domElement);
         transformControl.setSize(0.85);
@@ -301,6 +335,10 @@
 
         transformControl.addEventListener('dragging-changed', (event) => {
             orbit.enabled = !event.value;
+            // When user finishes dragging a 3D Gizmo arrow, save a snapshot to Undo History!
+            if (!event.value) {
+                saveHistoryState();
+            }
         });
 
         transformControl.addEventListener('change', () => {
@@ -327,8 +365,22 @@
             renderLayerList();
         });
 
+        // Smooth Camera Fly-To Animation State (for Focus Object 'F')
+        let camAnim = null;
+
         function animate() {
             requestAnimationFrame(animate);
+            if (camAnim) {
+                camAnim.progress += 0.12;
+                if (camAnim.progress >= 1) {
+                    camera.position.copy(camAnim.endPos);
+                    orbit.target.copy(camAnim.endTarget);
+                    camAnim = null;
+                } else {
+                    camera.position.lerpVectors(camAnim.startPos, camAnim.endPos, camAnim.progress);
+                    orbit.target.lerpVectors(camAnim.startTarget, camAnim.endTarget, camAnim.progress);
+                }
+            }
             orbit.update();
             renderer.render(scene, camera);
         }
@@ -341,9 +393,239 @@
         });
 
         // ============================================================================
-        // 2. TARGET IMAGE LOADER (FILE OR DROPBOX LINK) + IN-BROWSER .MIND COMPILER
+        // 2. SPACEBAR PANNING, SHORTCUTS (CTRL+Z, CTRL+SHIFT+Z, F, W, E, R) & FOCUS
         // ============================================================================
-        let activeTargetImageElement = null; // Stored for compiling .mind right in browser!
+        let isSpacePressed = false;
+
+        window.addEventListener('keydown', (e) => {
+            const activeTag = document.activeElement ? document.activeElement.tagName : '';
+            const isTyping = (activeTag === 'INPUT' || activeTag === 'TEXTAREA');
+
+            // Undo / Redo Keyboard Shortcuts (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y)
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    redo();
+                } else {
+                    undo();
+                }
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+                e.preventDefault();
+                redo();
+                return;
+            }
+
+            if (isTyping) return;
+
+            // Hold Spacebar -> Switch Left-Click Drag from Orbit to Pan!
+            if (e.code === 'Space' && !isSpacePressed) {
+                e.preventDefault();
+                isSpacePressed = true;
+                container.classList.add('space-pan');
+                orbit.mouseButtons.LEFT = THREE.MOUSE.PAN;
+                return;
+            }
+
+            const key = e.key.toLowerCase();
+            if (key === 'w') setGizmoMode('translate');
+            if (key === 'e') setGizmoMode('rotate');
+            if (key === 'r') setGizmoMode('scale');
+            if (key === 'f') {
+                e.preventDefault();
+                focusSelectedLayer();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                isSpacePressed = false;
+                container.classList.remove('space-pan');
+                orbit.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+            }
+        });
+
+        // Focus / Frame Selected Layer in Viewport ('F' key or 🎯 button)
+        window.focusSelectedLayer = function(specificLayerId) {
+            const targetId = specificLayerId || selectedId;
+            if (specificLayerId && specificLayerId !== selectedId) {
+                selectLayer(specificLayerId);
+            }
+            const layer = layers.find(l => l.id === targetId);
+            if (!layer || !layer.mesh) {
+                // If no layer selected, focus back on the Target Print Floor
+                camAnim = {
+                    progress: 0,
+                    startPos: camera.position.clone(),
+                    startTarget: orbit.target.clone(),
+                    endTarget: new THREE.Vector3(0, 0, 0),
+                    endPos: new THREE.Vector3(0, -0.9, 1.4)
+                };
+                showToast('🎯 Focused on Target Print Floor');
+                return;
+            }
+
+            const box = new THREE.Box3().setFromObject(layer.mesh);
+            const center = new THREE.Vector3();
+            const size = new THREE.Vector3();
+            box.getCenter(center);
+            box.getSize(size);
+
+            const maxDim = Math.max(size.x, size.y, size.z, 0.4);
+            const fitDistance = maxDim * 1.65;
+
+            // Keep current viewing direction if reasonable, otherwise frame from comfortable front-angle
+            const dir = camera.position.clone().sub(orbit.target);
+            if (dir.lengthSq() < 0.01) {
+                dir.set(0, -0.5, 1);
+            }
+            dir.normalize();
+
+            const newCamPos = center.clone().add(dir.multiplyScalar(fitDistance));
+
+            camAnim = {
+                progress: 0,
+                startPos: camera.position.clone(),
+                startTarget: orbit.target.clone(),
+                endTarget: center,
+                endPos: newCamPos
+            };
+            showToast(`🎯 Focused on "${layer.name}"`);
+        };
+
+        // ============================================================================
+        // 3. UNDO / REDO HISTORY ENGINE
+        // ============================================================================
+        let historyStack = [];
+        let historyIndex = -1;
+        let isRestoringHistory = false;
+
+        function serializeSceneState() {
+            return JSON.stringify({
+                selectedId,
+                layers: layers.map(l => ({
+                    id: l.id,
+                    name: l.name,
+                    type: l.type,
+                    url: l.url,
+                    localBlobUrl: l.localBlobUrl || '',
+                    pos: [...l.pos],
+                    scale: [...l.scale],
+                    rot: [...l.rot],
+                    color: l.color,
+                    similarity: l.similarity,
+                    smoothness: l.smoothness
+                }))
+            });
+        }
+
+        window.saveHistoryState = function() {
+            if (isRestoringHistory) return;
+            const snap = serializeSceneState();
+            if (historyIndex >= 0 && historyStack[historyIndex] === snap) return;
+
+            historyStack = historyStack.slice(0, historyIndex + 1);
+            historyStack.push(snap);
+            if (historyStack.length > 50) {
+                historyStack.shift();
+            } else {
+                historyIndex++;
+            }
+            updateUndoRedoButtons();
+        };
+
+        function updateUndoRedoButtons() {
+            document.getElementById('btn-undo').disabled = (historyIndex <= 0);
+            document.getElementById('btn-redo').disabled = (historyIndex >= historyStack.length - 1);
+        }
+
+        window.undo = function() {
+            if (historyIndex <= 0) return;
+            historyIndex--;
+            restoreFromSnapshot(historyStack[historyIndex]);
+            showToast('↩ Undo');
+        };
+
+        window.redo = function() {
+            if (historyIndex >= historyStack.length - 1) return;
+            historyIndex++;
+            restoreFromSnapshot(historyStack[historyIndex]);
+            showToast('↪ Redo');
+        };
+
+        function restoreFromSnapshot(jsonSnap) {
+            isRestoringHistory = true;
+            const state = JSON.parse(jsonSnap);
+
+            const snapIds = new Set(state.layers.map(s => s.id));
+
+            // 1. Remove layers that no longer exist in this snapshot
+            layers.slice().forEach(existing => {
+                if (!snapIds.has(existing.id)) {
+                    transformControl.detach();
+                    if (existing.mesh) scene.remove(existing.mesh);
+                    if (existing.videoEl) {
+                        existing.videoEl.pause();
+                        existing.videoEl.remove();
+                    }
+                    layers = layers.filter(l => l.id !== existing.id);
+                }
+            });
+
+            // 2. Add or update layers to match the snapshot
+            const rebuiltLayers = [];
+            state.layers.forEach(snapLayer => {
+                let layer = layers.find(l => l.id === snapLayer.id);
+                if (!layer) {
+                    layer = createLayerObject(snapLayer);
+                    const srcToLoad = layer.localBlobUrl || cleanDropbox(layer.url);
+                    if (srcToLoad) applyMediaToLayer(layer, srcToLoad, true);
+                } else {
+                    const prevUrl = layer.url;
+                    const prevBlob = layer.localBlobUrl;
+                    layer.name = snapLayer.name;
+                    layer.url = snapLayer.url;
+                    layer.localBlobUrl = snapLayer.localBlobUrl;
+                    layer.pos = [...snapLayer.pos];
+                    layer.scale = [...snapLayer.scale];
+                    layer.rot = [...snapLayer.rot];
+                    layer.color = snapLayer.color;
+                    layer.similarity = snapLayer.similarity;
+                    layer.smoothness = snapLayer.smoothness;
+
+                    if (layer.mesh) {
+                        layer.mesh.position.set(...layer.pos);
+                        layer.mesh.scale.set(...layer.scale);
+                        layer.mesh.rotation.set(
+                            THREE.MathUtils.degToRad(layer.rot[0]),
+                            THREE.MathUtils.degToRad(layer.rot[1]),
+                            THREE.MathUtils.degToRad(layer.rot[2])
+                        );
+                        if (layer.type === 'chroma' && layer.mesh.material && layer.mesh.material.uniforms) {
+                            layer.mesh.material.uniforms.color.value.set(layer.color);
+                            layer.mesh.material.uniforms.similarity.value = layer.similarity;
+                            layer.mesh.material.uniforms.smoothness.value = layer.smoothness;
+                        }
+                    }
+                    if (prevUrl !== layer.url || prevBlob !== layer.localBlobUrl) {
+                        const srcToLoad = layer.localBlobUrl || cleanDropbox(layer.url);
+                        if (srcToLoad) applyMediaToLayer(layer, srcToLoad, true);
+                    }
+                }
+                rebuiltLayers.push(layer);
+            });
+
+            layers = rebuiltLayers;
+            selectLayer(state.selectedId);
+            updateUndoRedoButtons();
+            isRestoringHistory = false;
+        }
+
+        // ============================================================================
+        // 4. TARGET IMAGE LOADER + IN-BROWSER .MIND COMPILER
+        // ============================================================================
+        let activeTargetImageElement = null;
 
         function cleanDropbox(url) {
             if (!url) return '';
@@ -358,7 +640,7 @@
             t.textContent = msg;
             t.style.display = 'block';
             clearTimeout(window._toastTimer);
-            window._toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3500);
+            window._toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3000);
         }
 
         function applyTargetImageSource(srcUrl) {
@@ -383,14 +665,12 @@
             img.src = srcUrl;
         }
 
-        // Option A: Local Target Image File
         document.getElementById('targetImgInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             applyTargetImageSource(URL.createObjectURL(file));
         });
 
-        // Option B: Dropbox Target Image Link (Auto-fetches preview!)
         let targetUrlTimer = null;
         window.loadTargetFromUrl = function() {
             clearTimeout(targetUrlTimer);
@@ -403,7 +683,6 @@
             }, 400);
         };
 
-        // Built-In MindAR Compiler (Runs 100% inside Creator Studio!)
         window.compileMindInBrowser = async function() {
             if (!activeTargetImageElement) {
                 alert('First upload a Target Photo (Option A) or paste a Dropbox Image Link (Option B) so it appears on the 3D floor!');
@@ -455,7 +734,7 @@
         };
 
         // ============================================================================
-        // 3. CAMERA PRESETS, RAYCASTER & GIZMOS
+        // 5. CAMERA PRESETS, RAYCASTER & VIDEO TRANSPORT CONTROLS
         // ============================================================================
         window.setGizmoMode = function(mode) {
             transformControl.setMode(mode);
@@ -464,14 +743,8 @@
             document.getElementById('gizmo-scale').classList.toggle('active', mode === 'scale');
         };
 
-        window.addEventListener('keydown', (e) => {
-            if (document.activeElement.tagName === 'INPUT') return;
-            if (e.key.toLowerCase() === 'w') setGizmoMode('translate');
-            if (e.key.toLowerCase() === 'e') setGizmoMode('rotate');
-            if (e.key.toLowerCase() === 'r') setGizmoMode('scale');
-        });
-
         window.setCameraPreset = function(preset) {
+            camAnim = null;
             orbit.target.set(0, 0, 0);
             if (preset === 'front') {
                 camera.position.set(0, 0, 1.6);
@@ -489,12 +762,61 @@
             orbit.update();
         };
 
+        // Video Play/Pause Controls
+        let globalVideosPlaying = true;
+
+        window.toggleAllVideos = function() {
+            globalVideosPlaying = !globalVideosPlaying;
+            layers.forEach(l => {
+                if (l.videoEl) {
+                    if (globalVideosPlaying) l.videoEl.play().catch(() => {});
+                    else l.videoEl.pause();
+                }
+            });
+            document.getElementById('globalPlayPauseBtn').textContent = globalVideosPlaying ? '⏸ Pause Videos' : '▶️ Play Videos';
+            updateVideoTransportUI();
+        };
+
+        window.toggleSelectedVideo = function() {
+            const layer = layers.find(l => l.id === selectedId);
+            if (!layer || !layer.videoEl) {
+                alert('Load a video link or local video file into this layer first!');
+                return;
+            }
+            if (layer.videoEl.paused) {
+                layer.videoEl.play().catch(() => {});
+            } else {
+                layer.videoEl.pause();
+            }
+            updateVideoTransportUI();
+        };
+
+        window.restartSelectedVideo = function() {
+            const layer = layers.find(l => l.id === selectedId);
+            if (!layer || !layer.videoEl) return;
+            layer.videoEl.currentTime = 0;
+            layer.videoEl.play().catch(() => {});
+            updateVideoTransportUI();
+        };
+
+        function updateVideoTransportUI() {
+            const layer = layers.find(l => l.id === selectedId);
+            const btn = document.getElementById('layerPlayPauseBtn');
+            if (!layer || !layer.videoEl) {
+                btn.textContent = '▶️ Play';
+                return;
+            }
+            btn.textContent = layer.videoEl.paused ? '▶️ Play' : '⏸ Pause';
+        }
+
+        // Raycaster Selection
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         let downPos = { x: 0, y: 0 };
 
         canvas.addEventListener('pointerdown', (e) => { downPos = { x: e.clientX, y: e.clientY }; });
         canvas.addEventListener('pointerup', (e) => {
+            if (isSpacePressed) return;
             if (Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 5) return;
             const rect = canvas.getBoundingClientRect();
             mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -514,7 +836,7 @@
         });
 
         // ============================================================================
-        // 4. LAYER CREATION & AUTO-FETCH DROPBOX PREVIEWS
+        // 6. LAYER CREATION & AUTO-FETCH DROPBOX PREVIEWS
         // ============================================================================
         let layers = [];
         let selectedId = null;
@@ -572,12 +894,53 @@
             return new THREE.CanvasTexture(c);
         }
 
+        function createLayerObject(cfg) {
+            const layer = {
+                id: cfg.id,
+                name: cfg.name,
+                type: cfg.type,
+                url: cfg.url || '',
+                localBlobUrl: cfg.localBlobUrl || '',
+                pos: [...cfg.pos],
+                scale: [...cfg.scale],
+                rot: [...cfg.rot],
+                color: cfg.color || '#00ff00',
+                similarity: cfg.similarity ?? 0.38,
+                smoothness: cfg.smoothness ?? 0.08,
+                mesh: null,
+                videoEl: null
+            };
+
+            if (layer.type === 'glb') {
+                const geo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x8b5cf6, roughness: 0.3 });
+                layer.mesh = new THREE.Mesh(geo, mat);
+            } else {
+                const borderCol = layer.type === 'chroma' ? '#10b981' : (layer.type === 'video' ? '#3b82f6' : '#f59e0b');
+                const tex = createPlaceholderTexture(layer.name, borderCol);
+                const geo = new THREE.PlaneGeometry(1, 1);
+                const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+                layer.mesh = new THREE.Mesh(geo, mat);
+            }
+
+            layer.mesh.userData.layerId = layer.id;
+            layer.mesh.position.set(...layer.pos);
+            layer.mesh.scale.set(...layer.scale);
+            layer.mesh.rotation.set(
+                THREE.MathUtils.degToRad(layer.rot[0]),
+                THREE.MathUtils.degToRad(layer.rot[1]),
+                THREE.MathUtils.degToRad(layer.rot[2])
+            );
+            scene.add(layer.mesh);
+            return layer;
+        }
+
         window.addLayer = function(type) {
             const id = 'layer_' + Date.now();
             const count = layers.length + 1;
             const zOffset = parseFloat((count * 0.06).toFixed(2));
 
-            const layer = {
+            const layer = createLayerObject({
                 id,
                 name: `${type.toUpperCase()} Layer ${count}`,
                 type,
@@ -587,35 +950,18 @@
                 rot: [0, 0, 0],
                 color: '#00ff00',
                 similarity: 0.38,
-                smoothness: 0.08,
-                mesh: null,
-                videoEl: null
-            };
-
-            if (type === 'glb') {
-                const geo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-                const mat = new THREE.MeshStandardMaterial({ color: 0x8b5cf6, roughness: 0.3 });
-                layer.mesh = new THREE.Mesh(geo, mat);
-            } else {
-                const borderCol = type === 'chroma' ? '#10b981' : (type === 'video' ? '#3b82f6' : '#f59e0b');
-                const tex = createPlaceholderTexture(layer.name, borderCol);
-                const geo = new THREE.PlaneGeometry(1, 1);
-                const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
-                layer.mesh = new THREE.Mesh(geo, mat);
-            }
-
-            layer.mesh.userData.layerId = id;
-            layer.mesh.position.set(...layer.pos);
-            scene.add(layer.mesh);
+                smoothness: 0.08
+            });
 
             layers.push(layer);
             selectLayer(id);
+            saveHistoryState();
             showToast(`Added ${layer.name} at Z: ${zOffset}`);
         };
 
-        function applyMediaToLayer(layer, mediaSourceUrl) {
+        function applyMediaToLayer(layer, mediaSourceUrl, silent = false) {
             if (!mediaSourceUrl) return;
-            showToast(`⏳ Loading ${layer.type.toUpperCase()} preview...`);
+            if (!silent) showToast(`⏳ Loading ${layer.type.toUpperCase()} preview...`);
 
             if (layer.type === 'video' || layer.type === 'chroma') {
                 if (layer.videoEl) {
@@ -628,7 +974,7 @@
                 vid.loop = true;
                 vid.muted = true;
                 vid.playsInline = true;
-                vid.play().catch(() => {});
+                if (globalVideosPlaying) vid.play().catch(() => {});
                 layer.videoEl = vid;
 
                 const vidTex = new THREE.VideoTexture(vid);
@@ -640,7 +986,8 @@
                         const aspect = vid.videoHeight / vid.videoWidth;
                         layer.mesh.geometry.dispose();
                         layer.mesh.geometry = new THREE.PlaneGeometry(1, aspect);
-                        showToast('✅ Video preview playing live in 3D Stage!');
+                        updateVideoTransportUI();
+                        if (!silent) showToast('✅ Video preview playing live in 3D Stage!');
                     }
                 });
 
@@ -649,6 +996,7 @@
                 } else {
                     layer.mesh.material = new THREE.MeshBasicMaterial({ map: vidTex, side: THREE.DoubleSide });
                 }
+                updateVideoTransportUI();
 
             } else if (layer.type === 'image') {
                 const img = new Image();
@@ -661,7 +1009,7 @@
                     layer.mesh.geometry.dispose();
                     layer.mesh.geometry = new THREE.PlaneGeometry(1, aspect);
                     layer.mesh.material = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.02, side: THREE.DoubleSide });
-                    showToast('✅ Image layer loaded into 3D Stage!');
+                    if (!silent) showToast('✅ Image layer loaded into 3D Stage!');
                 };
                 img.src = mediaSourceUrl;
 
@@ -693,7 +1041,7 @@
                     layer.mesh = wrapper;
                     scene.add(wrapper);
                     if (selectedId === layer.id) transformControl.attach(wrapper);
-                    showToast('✅ 3D .glb Model loaded into 3D Stage!');
+                    if (!silent) showToast('✅ 3D .glb Model loaded into 3D Stage!');
                 });
             }
         }
@@ -702,10 +1050,11 @@
             const file = e.target.files[0];
             const layer = layers.find(l => l.id === selectedId);
             if (!file || !layer) return;
-            applyMediaToLayer(layer, URL.createObjectURL(file));
+            layer.localBlobUrl = URL.createObjectURL(file);
+            applyMediaToLayer(layer, layer.localBlobUrl);
+            saveHistoryState();
         };
 
-        // Debounced Auto-Fetch when pasting a Dropbox URL in the Inspector
         let urlFetchTimer = null;
         window.handleDropboxUrl = function() {
             const layer = layers.find(l => l.id === selectedId);
@@ -715,7 +1064,8 @@
             if (layer.url) {
                 urlFetchTimer = setTimeout(() => {
                     applyMediaToLayer(layer, cleanDropbox(layer.url));
-                }, 350);
+                    saveHistoryState();
+                }, 400);
             }
         };
 
@@ -728,11 +1078,13 @@
                 transformControl.detach();
                 document.getElementById('inspectorEmpty').style.display = 'block';
                 document.getElementById('inspectorControls').style.display = 'none';
+                document.getElementById('inspectorFocusBtn').style.display = 'none';
                 return;
             }
 
             document.getElementById('inspectorEmpty').style.display = 'none';
             document.getElementById('inspectorControls').style.display = 'block';
+            document.getElementById('inspectorFocusBtn').style.display = 'inline-block';
             document.getElementById('inpLocalFile').value = '';
 
             if (layer.mesh) transformControl.attach(layer.mesh);
@@ -740,6 +1092,10 @@
             document.getElementById('inpName').value = layer.name;
             document.getElementById('inpUrl').value = layer.url;
             populateInspectorNumbers(layer);
+
+            const isVid = (layer.type === 'video' || layer.type === 'chroma');
+            document.getElementById('videoTransportBox').style.display = isVid ? 'block' : 'none';
+            if (isVid) updateVideoTransportUI();
 
             const chromaBox = document.getElementById('chromaBox');
             if (layer.type === 'chroma') {
@@ -835,6 +1191,7 @@
             layers = layers.filter(l => l.id !== selectedId);
             selectedId = layers.length ? layers[layers.length - 1].id : null;
             selectLayer(selectedId);
+            saveHistoryState();
         };
 
         function renderLayerList() {
@@ -847,7 +1204,33 @@
             layers.forEach(l => {
                 const item = document.createElement('div');
                 item.className = 'layer-item' + (l.id === selectedId ? ' active' : '');
-                item.innerHTML = `<span>${l.name}</span><small style="color:#a78bfa;">Z: ${l.pos[2]}</small>`;
+
+                const titleSpan = document.createElement('span');
+                titleSpan.textContent = l.name;
+                titleSpan.style.flex = '1';
+
+                const rightGroup = document.createElement('div');
+                rightGroup.style.display = 'flex';
+                rightGroup.style.alignItems = 'center';
+
+                const zBadge = document.createElement('small');
+                zBadge.style.color = '#a78bfa';
+                zBadge.textContent = `Z: ${l.pos[2]}`;
+
+                const findBtn = document.createElement('button');
+                findBtn.className = 'layer-focus-btn';
+                findBtn.title = 'Move Camera to this Layer (F)';
+                findBtn.textContent = '🎯';
+                findBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    focusSelectedLayer(l.id);
+                };
+
+                rightGroup.appendChild(zBadge);
+                rightGroup.appendChild(findBtn);
+
+                item.appendChild(titleSpan);
+                item.appendChild(rightGroup);
                 item.onclick = () => selectLayer(l.id);
                 list.appendChild(item);
             });
@@ -890,6 +1273,9 @@
             box.style.display = 'block';
             box.innerHTML = `<b>Ready-to-Scan V6 Link:</b><br><a href="${playerUrl}" target="_blank" style="color:#34d399;">${playerUrl}</a>`;
         };
+
+        // Record initial empty state so Undo can revert back to 0 layers
+        saveHistoryState();
     </script>
 </body>
 </html>
