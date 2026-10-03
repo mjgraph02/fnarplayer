@@ -3,34 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nizhali V6 Studio — All-in-One Edition</title>
+    <title>Nizhali V6 Studio — Pro AR Engine</title>
 
-    <!-- Three.js + OrbitControls + TransformControls (3D Gizmos) + GLTFLoader -->
+    <!-- Three.js + OrbitControls + TransformControls + GLTFLoader -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
-    <!-- Built-in MindAR Compiler Engine from your local repo -->
+    <!-- Built-in MindAR Compiler Engine -->
     <script type="module" src="./mindar-image.prod.js"></script>
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
-        body { width: 100vw; height: 100vh; overflow: hidden; background: #111217; color: #e4e4e7; display: grid; grid-template-columns: 310px 1fr 340px; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #111217; color: #e4e4e7; display: grid; grid-template-columns: 320px 1fr 360px; }
 
-        /* Panels */
         .panel { background: #181920; border-right: 1px solid #272935; display: flex; flex-direction: column; height: 100vh; overflow-y: auto; padding: 14px; z-index: 20; }
         .panel-right { border-right: none; border-left: 1px solid #272935; }
 
-        .brand-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #272935; margin-bottom: 10px; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid #272935; margin-bottom: 10px; }
         .brand-title { font-size: 14px; font-weight: 700; color: #a78bfa; letter-spacing: 0.8px; text-transform: uppercase; }
         .badge { background: #2e1065; color: #c4b5fd; font-size: 10px; padding: 3px 7px; border-radius: 6px; font-weight: 600; }
 
-        h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #8b8d98; margin: 14px 0 6px 0; }
+        h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #8b8d98; margin: 12px 0 6px 0; display: flex; justify-content: space-between; align-items: center; }
 
         .step-card { background: #13141b; border: 1px solid #252734; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
 
-        /* Buttons & Inputs */
         .btn { background: #222430; color: #f4f4f5; border: 1px solid #323546; padding: 8px 11px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; width: 100%; margin-bottom: 6px; text-align: left; transition: 0.15s; display: flex; align-items: center; gap: 8px; }
         .btn:hover:not(:disabled) { background: #2d3040; border-color: #7c3aed; }
         .btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -38,46 +36,41 @@
         .btn-compile:hover:not(:disabled) { background: #047857; }
         .btn-primary { background: #7c3aed; border-color: #8b5cf6; justify-content: center; font-size: 13px; padding: 11px; }
         .btn-primary:hover { background: #6d28d9; }
-        .btn-danger { background: #3b1822; border-color: #7f1d1d; color: #fca5a5; justify-content: center; margin-top: 14px; }
+        .btn-danger { background: #3b1822; border-color: #7f1d1d; color: #fca5a5; justify-content: center; margin-top: 12px; }
 
-        /* Progress Bar for Built-in .mind Compiler */
         .progress-wrap { width: 100%; height: 6px; background: #0e0f14; border-radius: 4px; overflow: hidden; margin-top: 6px; display: none; }
         .progress-bar { width: 0%; height: 100%; background: #10b981; transition: width 0.15s; }
 
-        .layer-item { padding: 8px 10px; border-radius: 7px; background: #121318; border: 1px solid #252733; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 12px; transition: 0.1s; }
+        /* Hierarchy & Folder Styling */
+        .layer-item { padding: 8px 10px; border-radius: 7px; background: #121318; border: 1px solid #252733; margin-bottom: 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 12px; transition: 0.1s; }
         .layer-item:hover { border-color: #4b5563; }
         .layer-item.active { border-color: #8b5cf6; background: #231d38; font-weight: 600; color: #fff; }
-        .layer-focus-btn { background: #272935; border: 1px solid #3f3f56; color: #cbd5e1; border-radius: 5px; padding: 2px 6px; font-size: 11px; cursor: pointer; margin-left: 6px; }
-        .layer-focus-btn:hover { background: #7c3aed; color: #fff; border-color: #8b5cf6; }
+        .layer-item.multi-selected { border-color: #38bdf8; background: #162436; }
+        .layer-item.child-layer { margin-left: 18px; border-left: 2px solid #6d28d9; }
+        .layer-focus-btn { background: #272935; border: 1px solid #3f3f56; color: #cbd5e1; border-radius: 5px; padding: 2px 6px; font-size: 11px; cursor: pointer; margin-left: 5px; }
+        .layer-focus-btn:hover { background: #7c3aed; color: #fff; }
 
-        label { display: block; font-size: 11px; color: #a1a1aa; margin: 7px 0 3px; }
-        input[type="text"], input[type="number"] { width: 100%; padding: 7px 9px; background: #0e0f14; border: 1px solid #2c2e3d; color: #fff; border-radius: 6px; font-size: 12px; user-select: text; }
-        input[type="text"]:focus, input[type="number"]:focus { outline: none; border-color: #8b5cf6; }
+        label { display: block; font-size: 11px; color: #a1a1aa; margin: 6px 0 3px; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 7px 9px; background: #0e0f14; border: 1px solid #2c2e3d; color: #fff; border-radius: 6px; font-size: 12px; user-select: text; }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus { outline: none; border-color: #8b5cf6; }
         input[type="range"] { width: 100%; accent-color: #8b5cf6; cursor: pointer; }
         .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
         .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 
-        /* Center Spark AR 3D Viewport */
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 12px; color: #e4e4e7; cursor: pointer; }
+        .toggle-row input[type="checkbox"] { accent-color: #8b5cf6; width: 16px; height: 16px; cursor: pointer; }
+
+        /* Viewport */
         #viewport-container { position: relative; width: 100%; height: 100vh; background: #0b0c10; overflow: hidden; }
         #viewport-container.space-pan { cursor: grab !important; }
         #viewport-container.space-pan:active { cursor: grabbing !important; }
         #webgl-canvas { width: 100%; height: 100%; display: block; }
 
         .top-toolbar {
-            position: absolute;
-            top: 14px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 10px;
-            background: rgba(24, 25, 32, 0.92);
-            backdrop-filter: blur(10px);
-            border: 1px solid #2e303e;
-            padding: 6px 12px;
-            border-radius: 10px;
-            z-index: 10;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.45);
-            white-space: nowrap;
+            position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 10px; background: rgba(24, 25, 32, 0.92); backdrop-filter: blur(10px);
+            border: 1px solid #2e303e; padding: 6px 12px; border-radius: 10px; z-index: 10;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.45); white-space: nowrap;
         }
         .tool-group { display: flex; gap: 4px; align-items: center; }
         .tool-divider { width: 1px; height: 20px; background: #2e303e; }
@@ -86,61 +79,37 @@
         .tool-btn:disabled { opacity: 0.35; cursor: not-allowed; }
         .tool-btn.active { background: #7c3aed; color: #fff; }
         .tool-btn.highlight { color: #34d399; border-color: rgba(16, 185, 129, 0.3); }
-        .tool-btn.highlight:hover { background: rgba(16, 185, 129, 0.15); }
 
         .viewport-footer {
-            position: absolute;
-            bottom: 14px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 16, 22, 0.88);
-            border: 1px solid #272935;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 11px;
-            color: #9ca3af;
-            pointer-events: none;
-            z-index: 10;
-            white-space: nowrap;
+            position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+            background: rgba(15, 16, 22, 0.88); border: 1px solid #272935; padding: 6px 14px;
+            border-radius: 20px; font-size: 11px; color: #9ca3af; pointer-events: none; z-index: 10; white-space: nowrap;
         }
 
         .status-toast {
-            position: absolute;
-            top: 64px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(16, 185, 129, 0.18);
-            border: 1px solid #10b981;
-            color: #34d399;
-            padding: 7px 16px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            display: none;
-            z-index: 10;
+            position: absolute; top: 64px; left: 50%; transform: translateX(-50%);
+            background: rgba(16, 185, 129, 0.18); border: 1px solid #10b981; color: #34d399;
+            padding: 7px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; display: none; z-index: 10;
         }
 
-        #export-box { margin-top: 10px; padding: 10px; background: #0e0f14; border: 1px dashed #4b5563; border-radius: 8px; font-family: monospace; font-size: 11px; word-break: break-all; color: #34d399; display: none; max-height: 140px; overflow-y: auto; user-select: text; }
+        #export-box { margin-top: 10px; padding: 10px; background: #0e0f14; border: 1px dashed #4b5563; border-radius: 8px; font-family: monospace; font-size: 11px; word-break: break-all; color: #34d399; display: none; max-height: 120px; overflow-y: auto; user-select: text; }
     </style>
 </head>
 <body>
 
-    <!-- 1. LEFT PANEL: TARGET IMAGE, BUILT-IN .MIND COMPILER & HIERARCHY -->
+    <!-- 1. LEFT PANEL: TARGET, UNIFIED ADD LAYER & MULTI-SELECT HIERARCHY -->
     <div class="panel">
         <div class="brand-header">
             <span class="brand-title">Nizhali V6 Studio</span>
-            <span class="badge">All-In-One</span>
+            <span class="badge">Pro Engine</span>
         </div>
 
-        <h3>1. Target Image & Built-In Compiler</h3>
+        <h3>1. Target Image & Compiler</h3>
         <div class="step-card">
-            <label>Option A: Upload Target Photo (From Computer)</label>
-            <input type="file" id="targetImgInput" accept="image/*" style="font-size:11px; width:100%; margin-bottom:6px;">
+            <label>Upload Target Photo OR Paste Dropbox Image Link</label>
+            <input type="file" id="targetImgInput" accept="image/*" style="font-size:11px; width:100%; margin-bottom:5px;">
+            <input type="text" id="targetImgUrlInput" placeholder="https://www.dropbox.com/.../target.jpg" oninput="loadTargetFromUrl()">
 
-            <label>Option B: Or Paste Dropbox Target Image Link</label>
-            <input type="text" id="targetImgUrlInput" placeholder="https://www.dropbox.com/.../photo.jpg" oninput="loadTargetFromUrl()">
-
-            <!-- Built-in MindAR Compiler Button -->
             <button class="btn btn-compile" id="compileMindBtn" onclick="compileMindInBrowser()">
                 ⚙️ Compile & Download .mind File
             </button>
@@ -149,45 +118,47 @@
             </div>
             <div id="compileStatusText" style="font-size:11px; color:#34d399; margin-top:4px; display:none;"></div>
 
-            <label style="margin-top:10px; color:#c4b5fd;">Dropbox Compiled .mind Link (For Final Export)</label>
+            <label style="margin-top:8px; color:#c4b5fd;">Dropbox Compiled .mind Link (For Final Export)</label>
             <input type="text" id="mindUrlInput" placeholder="Paste Dropbox link of compiled .mind file">
         </div>
 
-        <h3>2. Add 3D Layers</h3>
-        <button class="btn" onclick="addLayer('chroma')">🟩 + Add Chroma Key Video</button>
-        <button class="btn" onclick="addLayer('video')">🎬 + Add Standard Video</button>
-        <button class="btn" onclick="addLayer('image')">🖼️ + Add Transparent PNG</button>
-        <button class="btn" onclick="addLayer('glb')">🧊 + Add 3D Model (.glb)</button>
+        <h3>2. Add Objects & Folders</h3>
+        <button class="btn btn-primary" onclick="addMediaLayer()" style="margin-bottom:6px;">
+            ➕ Add Media Layer (.mp4 / .png / .glb)
+        </button>
+        <div class="row-2">
+            <button class="btn" onclick="groupSelectedLayers()" title="Shortcut: Ctrl+G">📁 Group Selected</button>
+            <button class="btn" onclick="ungroupSelectedFolder()">📂 Ungroup</button>
+        </div>
 
-        <h3>3. Scene Hierarchy <small style="color:#666; font-weight:normal;">(Click 🎯 to find)</small></h3>
+        <h3>
+            <span>3. Scene Hierarchy</span>
+            <small style="color:#666; font-weight:normal; text-transform:none;">Ctrl/Shift + Click to multi-select</small>
+        </h3>
         <div id="layerList">
             <div style="color:#666; font-size:11px; padding:6px 0;">No layers added yet.</div>
         </div>
     </div>
 
-    <!-- 2. CENTER PANEL: SPARK AR 3D VIEWPORT -->
+    <!-- 2. CENTER PANEL: 3D STAGE VIEWPORT -->
     <div id="viewport-container">
         <div class="top-toolbar">
-            <!-- Undo / Redo Group -->
             <div class="tool-group">
-                <button class="tool-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z / Cmd+Z)">↩ Undo</button>
+                <button class="tool-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
                 <button class="tool-btn" id="btn-redo" onclick="redo()" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
             </div>
             <div class="tool-divider"></div>
-            <!-- Gizmo Modes -->
             <div class="tool-group">
-                <button class="tool-btn active" id="gizmo-translate" onclick="setGizmoMode('translate')" title="Move Tool (W)">✥ Move (W)</button>
-                <button class="tool-btn" id="gizmo-rotate" onclick="setGizmoMode('rotate')" title="Rotate Tool (E)">↻ Rotate (E)</button>
-                <button class="tool-btn" id="gizmo-scale" onclick="setGizmoMode('scale')" title="Scale Tool (R)">⤢ Scale (R)</button>
+                <button class="tool-btn active" id="gizmo-translate" onclick="setGizmoMode('translate')" title="Move (W)">✥ Move (W)</button>
+                <button class="tool-btn" id="gizmo-rotate" onclick="setGizmoMode('rotate')" title="Rotate (E)">↻ Rotate (E)</button>
+                <button class="tool-btn" id="gizmo-scale" onclick="setGizmoMode('scale')" title="Scale (R)">⤢ Scale (R)</button>
             </div>
             <div class="tool-divider"></div>
-            <!-- Focus Selected & Global Video Play/Pause -->
             <div class="tool-group">
-                <button class="tool-btn highlight" onclick="focusSelectedLayer()" title="Move Camera to Selected Object (Shortcut: F)">🎯 Focus (F)</button>
-                <button class="tool-btn" id="globalPlayPauseBtn" onclick="toggleAllVideos()" title="Play/Pause All Videos in Scene">⏸ Pause Videos</button>
+                <button class="tool-btn highlight" onclick="focusSelectedLayer()" title="Focus Selected (F)">🎯 Focus (F)</button>
+                <button class="tool-btn" id="globalPlayPauseBtn" onclick="toggleAllPlayback()">⏸ Pause All</button>
             </div>
             <div class="tool-divider"></div>
-            <!-- Camera Preset Angles -->
             <div class="tool-group">
                 <button class="tool-btn" onclick="setCameraPreset('front')">Front</button>
                 <button class="tool-btn" onclick="setCameraPreset('perspective')">3D Orbit</button>
@@ -199,80 +170,132 @@
         <div id="toast" class="status-toast"></div>
 
         <div class="viewport-footer">
-            🖐️ <b>Hold Spacebar + Drag:</b> Pan Left/Right/Up/Down | <b>Drag:</b> Orbit 360° | <b>Press F:</b> Find Selected Object | <b>Ctrl+Z:</b> Undo
+            🖐️ <b>Spacebar + Drag:</b> Pan | <b>Ctrl/Shift + Click:</b> Multi-Select | <b>Ctrl+G:</b> Group Folder | <b>F:</b> Focus Object
         </div>
 
         <canvas id="webgl-canvas"></canvas>
     </div>
 
-    <!-- 3. RIGHT PANEL: INSPECTOR & EXPORT -->
+    <!-- 3. RIGHT PANEL: INSPECTOR, PLAYHEAD SCRUBBER & EFFECTS -->
     <div class="panel panel-right">
         <div class="brand-header">
             <span class="brand-title">Inspector</span>
-            <button class="layer-focus-btn" id="inspectorFocusBtn" style="display:none;" onclick="focusSelectedLayer()">🎯 Find in Viewport (F)</button>
+            <button class="layer-focus-btn" id="inspectorFocusBtn" style="display:none;" onclick="focusSelectedLayer()">🎯 Find (F)</button>
         </div>
 
         <div id="inspectorEmpty" style="color:#71717a; font-size:12px; line-height:1.6;">
-            Select or add a layer to load media via Dropbox link or local file and position it in 3D space.
+            Click <b>➕ Add Media Layer</b> on the left. Every layer spawns at <b>0, 0, 0</b> and automatically detects <b>.mp4</b>, <b>.png</b>, or <b>.glb</b>!
         </div>
 
         <div id="inspectorControls" style="display:none;">
-            <label>Layer Name</label>
+            <label>Name</label>
             <input type="text" id="inpName" oninput="syncUIFromInspector()" onchange="saveHistoryState()">
 
-            <div class="step-card" style="margin-top:8px;">
-                <label style="color:#34d399; margin-top:0;">Option 1: Paste Dropbox Link (Auto-Previews Live!)</label>
-                <input type="text" id="inpUrl" placeholder="Paste Dropbox .mp4 / .png / .glb link..." oninput="handleDropboxUrl()">
+            <!-- Media Source Box (Hidden if Folder is selected) -->
+            <div id="mediaSourceCard" class="step-card" style="margin-top:8px;">
+                <label style="color:#34d399; margin-top:0;">Dropbox Link (.mp4 / .png / .glb) — Auto-Detects!</label>
+                <input type="text" id="inpUrl" placeholder="Paste Dropbox link..." oninput="handleDropboxUrl()">
 
-                <label style="margin-top:8px;">Option 2: Or Upload Local File for Quick Test</label>
-                <input type="file" id="inpLocalFile" style="font-size:11px; width:100%;" onchange="handleLocalFile(event)">
+                <label style="margin-top:6px;">Or Choose Local File (.mp4 / .png / .glb)</label>
+                <input type="file" id="inpLocalFile" accept="video/*,image/*,.glb,.gltf" style="font-size:11px; width:100%;" onchange="handleLocalFile(event)">
             </div>
 
-            <!-- Video Playback Controls (Shown when selected layer is Video or Chroma) -->
-            <div id="videoTransportBox" class="step-card" style="display:none; border-color:#3b82f6;">
-                <label style="color:#60a5fa; margin-top:0; margin-bottom:6px;">🎬 Video Playback Controls</label>
-                <div class="row-2">
-                    <button class="btn" id="layerPlayPauseBtn" style="justify-content:center; margin:0;" onclick="toggleSelectedVideo()">⏸ Pause</button>
-                    <button class="btn" style="justify-content:center; margin:0;" onclick="restartSelectedVideo()">⏮ Restart</button>
+            <!-- TIMELINE PLAYHEAD SCRUBBER (For Video & Animated 3D .glb Models!) -->
+            <div id="timelineCard" class="step-card" style="display:none; border-color:#3b82f6;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-size:11px; font-weight:600; color:#60a5fa;" id="timelineLabel">🎬 Timeline Scrubber</span>
+                    <span style="font-size:11px; font-family:monospace; color:#cbd5e1;" id="timecodeDisplay">0.00s / 0.00s</span>
+                </div>
+                <input type="range" id="timelineScrubber" min="0" max="100" step="0.01" value="0" oninput="scrubTimeline(this.value)">
+                <div class="row-2" style="margin-top:6px;">
+                    <button class="btn" id="layerPlayPauseBtn" style="justify-content:center; margin:0;" onclick="toggleSelectedMediaPlayback()">⏸ Pause</button>
+                    <button class="btn" style="justify-content:center; margin:0;" onclick="restartSelectedMedia()">⏮ Frame 0</button>
+                </div>
+                <div id="glbClipRow" style="display:none; margin-top:6px;">
+                    <label>3D Animation Clip Inside .glb</label>
+                    <select id="glbClipSelect" onchange="changeGlbClip()"></select>
                 </div>
             </div>
 
-            <h3>Position (X, Y, Z-Depth Popout)</h3>
+            <!-- 3D TRANSFORMS (Default 0, 0, 0) -->
+            <h3>Transform (Default: 0, 0, 0)</h3>
             <div class="row-3">
-                <div><label style="color:#f87171;">X (Red)</label><input type="number" id="posX" step="0.02" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label style="color:#4ade80;">Y (Green)</label><input type="number" id="posY" step="0.02" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label style="color:#60a5fa;">Z (Depth)</label><input type="number" id="posZ" step="0.02" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label style="color:#f87171;">Pos X</label><input type="number" id="posX" step="0.02" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label style="color:#4ade80;">Pos Y</label><input type="number" id="posY" step="0.02" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label style="color:#60a5fa;">Pos Z</label><input type="number" id="posZ" step="0.02" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+            </div>
+            <div class="row-3" style="margin-top:4px;">
+                <div><label>Scale X</label><input type="number" id="scaleX" step="0.05" value="1" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label>Scale Y</label><input type="number" id="scaleY" step="0.05" value="1" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label>Scale Z</label><input type="number" id="scaleZ" step="0.05" value="1" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+            </div>
+            <div class="row-3" style="margin-top:4px;">
+                <div><label>Rot X</label><input type="number" id="rotX" step="5" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label>Rot Y</label><input type="number" id="rotY" step="5" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label>Rot Z</label><input type="number" id="rotZ" step="5" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
             </div>
 
-            <h3>Scale (Size Multiplier)</h3>
-            <div class="row-3">
-                <div><label>Scale X</label><input type="number" id="scaleX" step="0.05" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label>Scale Y</label><input type="number" id="scaleY" step="0.05" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label>Scale Z</label><input type="number" id="scaleZ" step="0.05" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+            <!-- EFFECTS & PRESET ANIMATIONS -->
+            <h3>Built-In Effects & Preset Animations</h3>
+            <div class="step-card">
+                <!-- 1. Preset Animation Selector -->
+                <label style="color:#c4b5fd; margin-top:0;">✨ Preset Animation (No External Keyframes Needed)</label>
+                <select id="animPreset" onchange="syncEffectsFromInputs(); saveHistoryState();">
+                    <option value="none">None (Static)</option>
+                    <option value="float">🎈 Floating (Smooth Up/Down Bob)</option>
+                    <option value="spinY">🔄 Spin 360° (Turntable Y-Axis)</option>
+                    <option value="spinZ">🎡 Spin 360° (Wheel Z-Axis)</option>
+                    <option value="pulse">💓 Pulse / Heartbeat Scale</option>
+                    <option value="wiggle">〰️ Wiggle / Shake Tilt</option>
+                    <option value="fadeIn">🌅 Fade In on Target Found</option>
+                    <option value="fadeOut">🌇 Fade Out Loop</option>
+                </select>
+
+                <div id="animParamsBox" style="display:none; margin-top:6px;">
+                    <div class="row-2">
+                        <div>
+                            <label>Speed (<span id="animSpeedVal">1.0</span>x)</label>
+                            <input type="range" id="animSpeed" min="0.2" max="4.0" step="0.1" value="1.0" oninput="syncEffectsFromInputs()" onchange="saveHistoryState()">
+                        </div>
+                        <div>
+                            <label>Intensity (<span id="animAmpVal">1.0</span>x)</label>
+                            <input type="range" id="animAmp" min="0.2" max="3.0" step="0.1" value="1.0" oninput="syncEffectsFromInputs()" onchange="saveHistoryState()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Portal Window Mask Effect (For Z < 0) -->
+                <div style="border-top:1px solid #252734; margin-top:8px; padding-top:6px;">
+                    <label class="toggle-row">
+                        <span>🕳️ <b>Portal Window Mask</b> (Clip outside Target Frame)</span>
+                        <input type="checkbox" id="portalToggle" onchange="syncEffectsFromInputs(); saveHistoryState();">
+                    </label>
+                    <small style="color:#71717a; font-size:10px; display:block;">
+                        Put layer at negative Z (e.g. <b>Pos Z = -0.25</b>) and scale it up. It will live <i>inside</i> the target frame like a deep 3D window without bleeding outside!
+                    </small>
+                </div>
+
+                <!-- 3. Chroma Key Effect (Toggleable!) -->
+                <div id="chromaEffectSection" style="border-top:1px solid #252734; margin-top:8px; padding-top:6px;">
+                    <label class="toggle-row">
+                        <span>🟩 <b>Chroma Key Green/Blue Screen</b></span>
+                        <input type="checkbox" id="chromaToggle" onchange="syncEffectsFromInputs(); saveHistoryState();">
+                    </label>
+                    <div id="chromaParamsBox" style="display:none; margin-top:6px;">
+                        <label>Key Color</label>
+                        <input type="color" id="chromaColor" value="#00ff00" style="width:100%; height:28px; border:none; background:none; cursor:pointer;" oninput="syncEffectsFromInputs()" onchange="saveHistoryState()">
+                        <label>Similarity (<span id="simVal">0.38</span>)</label>
+                        <input type="range" id="chromaSim" min="0.05" max="0.8" step="0.01" value="0.38" oninput="syncEffectsFromInputs()" onchange="saveHistoryState()">
+                        <label>Smoothness (<span id="smoothVal">0.08</span>)</label>
+                        <input type="range" id="chromaSmooth" min="0.01" max="0.3" step="0.01" value="0.08" oninput="syncEffectsFromInputs()" onchange="saveHistoryState()">
+                    </div>
+                </div>
             </div>
 
-            <h3>Rotation (Degrees)</h3>
-            <div class="row-3">
-                <div><label>Rot X</label><input type="number" id="rotX" step="5" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label>Rot Y</label><input type="number" id="rotY" step="5" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label>Rot Z</label><input type="number" id="rotZ" step="5" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-            </div>
-
-            <!-- Chroma Key Settings -->
-            <div id="chromaBox" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #272935;">
-                <h3 style="margin-top:0; color:#34d399;">Chroma Key Green Screen</h3>
-                <label>Key Color</label>
-                <input type="color" id="chromaColor" value="#00ff00" style="width:100%; height:30px; border:none; background:none; cursor:pointer;" oninput="syncChromaFromInputs()" onchange="saveHistoryState()">
-                <label>Similarity / Cutoff (<span id="simVal">0.38</span>)</label>
-                <input type="range" id="chromaSim" min="0.05" max="0.8" step="0.01" value="0.38" oninput="syncChromaFromInputs()" onchange="saveHistoryState()">
-                <label>Smoothness (<span id="smoothVal">0.08</span>)</label>
-                <input type="range" id="chromaSmooth" min="0.01" max="0.3" step="0.01" value="0.08" oninput="syncChromaFromInputs()" onchange="saveHistoryState()">
-            </div>
-
-            <button class="btn btn-danger" onclick="deleteSelectedLayer()">🗑️ Delete Layer</button>
+            <button class="btn btn-danger" onclick="deleteSelectedLayers()">🗑️ Delete Selected</button>
         </div>
 
-        <div style="margin-top:auto; padding-top:14px; border-top:1px solid #272935;">
+        <div style="margin-top:auto; padding-top:12px; border-top:1px solid #272935;">
             <button class="btn btn-primary" onclick="exportProject()">⚡ Generate V6 AR Link</button>
             <div id="export-box"></div>
         </div>
@@ -280,7 +303,7 @@
 
     <script>
         // ============================================================================
-        // 1. THREE.JS 3D VIEWPORT & GIZMOS SETUP
+        // 1. THREE.JS SCENE, PORTAL OCCLUDER MASK & GIZMO SETUP
         // ============================================================================
         const container = document.getElementById('viewport-container');
         const canvas = document.getElementById('webgl-canvas');
@@ -307,7 +330,8 @@
         gridHelper.position.z = -0.005;
         scene.add(gridHelper);
 
-        // Target Floor Plane
+        // Target Floor Plane (Z = 0)
+        let currentTargetAspect = 1.0;
         const targetGeo = new THREE.PlaneGeometry(1, 1);
         const placeholderCanvas = document.createElement('canvas');
         placeholderCanvas.width = 512; placeholderCanvas.height = 512;
@@ -320,14 +344,52 @@
         ctx.fillText('Upload or Paste Image Link in Step 1', 256, 275);
 
         const defaultTargetTex = new THREE.CanvasTexture(placeholderCanvas);
-        const targetMat = new THREE.MeshBasicMaterial({ map: defaultTargetTex, side: THREE.DoubleSide });
+        const targetMat = new THREE.MeshBasicMaterial({ map: defaultTargetTex, side: THREE.DoubleSide, transparent: true, opacity: 0.92 });
         const targetMesh = new THREE.Mesh(targetGeo, targetMat);
         scene.add(targetMesh);
+
+        // PORTAL OCCLUDER RING (Masks negative-Z portal layers outside the 1.0 x Aspect target window!)
+        const portalMaskGroup = new THREE.Group();
+        portalMaskGroup.renderOrder = 0;
+        scene.add(portalMaskGroup);
+
+        function rebuildPortalMask(aspect) {
+            while (portalMaskGroup.children.length) portalMaskGroup.remove(portalMaskGroup.children[0]);
+            // In Studio we make the mask semi-transparent dark around the frame so user sees the portal clipping live!
+            const maskMat = new THREE.MeshBasicMaterial({
+                color: 0x0b0c10,
+                colorWrite: true,
+                depthWrite: true,
+                side: THREE.DoubleSide
+            });
+            const M = 12; // Outer mask size
+            const hW = 0.5;
+            const hH = aspect / 2;
+
+            // Top, Bottom, Left, Right遮罩 planes around the target hole at Z = -0.001
+            const topP = new THREE.Mesh(new THREE.PlaneGeometry(M, (M - aspect) / 2), maskMat);
+            topP.position.set(0, hH + (M - aspect) / 4, -0.001);
+
+            const botP = new THREE.Mesh(new THREE.PlaneGeometry(M, (M - aspect) / 2), maskMat);
+            botP.position.set(0, -hH - (M - aspect) / 4, -0.001);
+
+            const leftP = new THREE.Mesh(new THREE.PlaneGeometry((M - 1) / 2, aspect), maskMat);
+            leftP.position.set(-hW - (M - 1) / 4, 0, -0.001);
+
+            const rightP = new THREE.Mesh(new THREE.PlaneGeometry((M - 1) / 2, aspect), maskMat);
+            rightP.position.set(hW + (M - 1) / 4, 0, -0.001);
+
+            [topP, botP, leftP, rightP].forEach(p => {
+                p.renderOrder = 0;
+                portalMaskGroup.add(p);
+            });
+        }
+        rebuildPortalMask(1.0);
 
         const orbit = new THREE.OrbitControls(camera, renderer.domElement);
         orbit.enableDamping = true;
         orbit.dampingFactor = 0.08;
-        orbit.screenSpacePanning = true; // Ensures panning moves cleanly Left/Right/Up/Down relative to screen!
+        orbit.screenSpacePanning = true;
 
         const transformControl = new THREE.TransformControls(camera, renderer.domElement);
         transformControl.setSize(0.85);
@@ -335,41 +397,104 @@
 
         transformControl.addEventListener('dragging-changed', (event) => {
             orbit.enabled = !event.value;
-            // When user finishes dragging a 3D Gizmo arrow, save a snapshot to Undo History!
-            if (!event.value) {
-                saveHistoryState();
-            }
+            if (!event.value) saveHistoryState();
         });
 
         transformControl.addEventListener('change', () => {
-            if (!selectedId) return;
-            const layer = layers.find(l => l.id === selectedId);
-            if (!layer || !layer.mesh) return;
+            const activeItem = getPrimarySelectedItem();
+            if (!activeItem || !activeItem.mesh) return;
 
-            layer.pos = [
-                parseFloat(layer.mesh.position.x.toFixed(3)),
-                parseFloat(layer.mesh.position.y.toFixed(3)),
-                parseFloat(layer.mesh.position.z.toFixed(3))
+            activeItem.pos = [
+                parseFloat(activeItem.mesh.position.x.toFixed(3)),
+                parseFloat(activeItem.mesh.position.y.toFixed(3)),
+                parseFloat(activeItem.mesh.position.z.toFixed(3))
             ];
-            layer.scale = [
-                parseFloat(layer.mesh.scale.x.toFixed(3)),
-                parseFloat(layer.mesh.scale.y.toFixed(3)),
-                parseFloat(layer.mesh.scale.z.toFixed(3))
+            activeItem.scale = [
+                parseFloat(activeItem.mesh.scale.x.toFixed(3)),
+                parseFloat(activeItem.mesh.scale.y.toFixed(3)),
+                parseFloat(activeItem.mesh.scale.z.toFixed(3))
             ];
-            layer.rot = [
-                parseFloat(THREE.MathUtils.radToDeg(layer.mesh.rotation.x).toFixed(1)),
-                parseFloat(THREE.MathUtils.radToDeg(layer.mesh.rotation.y).toFixed(1)),
-                parseFloat(THREE.MathUtils.radToDeg(layer.mesh.rotation.z).toFixed(1))
+            activeItem.rot = [
+                parseFloat(THREE.MathUtils.radToDeg(activeItem.mesh.rotation.x).toFixed(1)),
+                parseFloat(THREE.MathUtils.radToDeg(activeItem.mesh.rotation.y).toFixed(1)),
+                parseFloat(THREE.MathUtils.radToDeg(activeItem.mesh.rotation.z).toFixed(1))
             ];
-            populateInspectorNumbers(layer);
+            populateInspectorNumbers(activeItem);
             renderLayerList();
         });
 
-        // Smooth Camera Fly-To Animation State (for Focus Object 'F')
+        // ============================================================================
+        // 2. RENDER LOOP, TIMELINE PLAYHEAD & PRESET ANIMATIONS ENGINE
+        // ============================================================================
+        const clock = new THREE.Clock();
         let camAnim = null;
+        let globalPlaying = true;
 
         function animate() {
             requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
+
+            // Check if any layer uses Portal Window Mask
+            const anyPortal = layers.some(l => l.portalMask);
+            portalMaskGroup.visible = anyPortal;
+            // Make target floor slightly see-through when a portal is active so you can see inside the frame!
+            targetMat.opacity = anyPortal ? 0.35 : 0.95;
+
+            // Update Preset Animations & 3D .glb Mixers
+            layers.forEach(l => {
+                if (l.isFolder || !l.mesh) return;
+
+                // Update .glb AnimationMixer if playing
+                if (l.mixer && l.isPlaying) {
+                    l.mixer.update(delta);
+                }
+
+                // Apply Built-In Preset Animations (Around base user transform!)
+                const isBeingDragged = (transformControl.dragging && selectedIds.includes(l.id));
+                if (!isBeingDragged && globalPlaying && l.animPreset && l.animPreset !== 'none') {
+                    const spd = (l.animSpeed || 1.0) * 2.2;
+                    const amp = (l.animAmp || 1.0);
+                    const t = elapsed * spd;
+
+                    // Start from user's base transform
+                    let px = l.pos[0], py = l.pos[1], pz = l.pos[2];
+                    let sx = l.scale[0], sy = l.scale[1], sz = l.scale[2];
+                    let rx = l.rot[0], ry = l.rot[1], rz = l.rot[2];
+
+                    if (l.animPreset === 'float') {
+                        pz += Math.sin(t) * 0.06 * amp;
+                    } else if (l.animPreset === 'spinY') {
+                        ry = (ry + elapsed * 60 * (l.animSpeed || 1)) % 360;
+                    } else if (l.animPreset === 'spinZ') {
+                        rz = (rz + elapsed * 60 * (l.animSpeed || 1)) % 360;
+                    } else if (l.animPreset === 'pulse') {
+                        const factor = 1 + Math.sin(t * 1.5) * 0.12 * amp;
+                        sx *= factor; sy *= factor; sz *= factor;
+                    } else if (l.animPreset === 'wiggle') {
+                        rz += Math.sin(t * 2.5) * 8 * amp;
+                        rx += Math.cos(t * 2.0) * 5 * amp;
+                    } else if (l.animPreset === 'fadeIn' || l.animPreset === 'fadeOut') {
+                        const cycle = (elapsed * (l.animSpeed || 1) * 0.4) % 1;
+                        const alpha = l.animPreset === 'fadeIn' ? cycle : (1 - cycle);
+                        setMeshOpacity(l, alpha);
+                    }
+
+                    l.mesh.position.set(px, py, pz);
+                    l.mesh.scale.set(sx, sy, sz);
+                    l.mesh.rotation.set(
+                        THREE.MathUtils.degToRad(rx),
+                        THREE.MathUtils.degToRad(ry),
+                        THREE.MathUtils.degToRad(rz)
+                    );
+                } else if (!isBeingDragged && l.animPreset === 'none') {
+                    setMeshOpacity(l, 1.0);
+                }
+            });
+
+            // Update Playhead Scrubber Bar in Inspector for active Video or .glb Animation
+            updatePlayheadUI();
+
             if (camAnim) {
                 camAnim.progress += 0.12;
                 if (camAnim.progress >= 1) {
@@ -381,467 +506,136 @@
                     orbit.target.lerpVectors(camAnim.startTarget, camAnim.endTarget, camAnim.progress);
                 }
             }
+
             orbit.update();
             renderer.render(scene, camera);
         }
-        animate();
 
-        window.addEventListener('resize', () => {
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
-        });
-
-        // ============================================================================
-        // 2. SPACEBAR PANNING, SHORTCUTS (CTRL+Z, CTRL+SHIFT+Z, F, W, E, R) & FOCUS
-        // ============================================================================
-        let isSpacePressed = false;
-
-        window.addEventListener('keydown', (e) => {
-            const activeTag = document.activeElement ? document.activeElement.tagName : '';
-            const isTyping = (activeTag === 'INPUT' || activeTag === 'TEXTAREA');
-
-            // Undo / Redo Keyboard Shortcuts (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y)
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    redo();
-                } else {
-                    undo();
-                }
-                return;
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-                e.preventDefault();
-                redo();
-                return;
-            }
-
-            if (isTyping) return;
-
-            // Hold Spacebar -> Switch Left-Click Drag from Orbit to Pan!
-            if (e.code === 'Space' && !isSpacePressed) {
-                e.preventDefault();
-                isSpacePressed = true;
-                container.classList.add('space-pan');
-                orbit.mouseButtons.LEFT = THREE.MOUSE.PAN;
-                return;
-            }
-
-            const key = e.key.toLowerCase();
-            if (key === 'w') setGizmoMode('translate');
-            if (key === 'e') setGizmoMode('rotate');
-            if (key === 'r') setGizmoMode('scale');
-            if (key === 'f') {
-                e.preventDefault();
-                focusSelectedLayer();
-            }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            if (e.code === 'Space') {
-                isSpacePressed = false;
-                container.classList.remove('space-pan');
-                orbit.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
-            }
-        });
-
-        // Focus / Frame Selected Layer in Viewport ('F' key or 🎯 button)
-        window.focusSelectedLayer = function(specificLayerId) {
-            const targetId = specificLayerId || selectedId;
-            if (specificLayerId && specificLayerId !== selectedId) {
-                selectLayer(specificLayerId);
-            }
-            const layer = layers.find(l => l.id === targetId);
-            if (!layer || !layer.mesh) {
-                // If no layer selected, focus back on the Target Print Floor
-                camAnim = {
-                    progress: 0,
-                    startPos: camera.position.clone(),
-                    startTarget: orbit.target.clone(),
-                    endTarget: new THREE.Vector3(0, 0, 0),
-                    endPos: new THREE.Vector3(0, -0.9, 1.4)
-                };
-                showToast('🎯 Focused on Target Print Floor');
-                return;
-            }
-
-            const box = new THREE.Box3().setFromObject(layer.mesh);
-            const center = new THREE.Vector3();
-            const size = new THREE.Vector3();
-            box.getCenter(center);
-            box.getSize(size);
-
-            const maxDim = Math.max(size.x, size.y, size.z, 0.4);
-            const fitDistance = maxDim * 1.65;
-
-            // Keep current viewing direction if reasonable, otherwise frame from comfortable front-angle
-            const dir = camera.position.clone().sub(orbit.target);
-            if (dir.lengthSq() < 0.01) {
-                dir.set(0, -0.5, 1);
-            }
-            dir.normalize();
-
-            const newCamPos = center.clone().add(dir.multiplyScalar(fitDistance));
-
-            camAnim = {
-                progress: 0,
-                startPos: camera.position.clone(),
-                startTarget: orbit.target.clone(),
-                endTarget: center,
-                endPos: newCamPos
-            };
-            showToast(`🎯 Focused on "${layer.name}"`);
-        };
-
-        // ============================================================================
-        // 3. UNDO / REDO HISTORY ENGINE
-        // ============================================================================
-        let historyStack = [];
-        let historyIndex = -1;
-        let isRestoringHistory = false;
-
-        function serializeSceneState() {
-            return JSON.stringify({
-                selectedId,
-                layers: layers.map(l => ({
-                    id: l.id,
-                    name: l.name,
-                    type: l.type,
-                    url: l.url,
-                    localBlobUrl: l.localBlobUrl || '',
-                    pos: [...l.pos],
-                    scale: [...l.scale],
-                    rot: [...l.rot],
-                    color: l.color,
-                    similarity: l.similarity,
-                    smoothness: l.smoothness
-                }))
-            });
-        }
-
-        window.saveHistoryState = function() {
-            if (isRestoringHistory) return;
-            const snap = serializeSceneState();
-            if (historyIndex >= 0 && historyStack[historyIndex] === snap) return;
-
-            historyStack = historyStack.slice(0, historyIndex + 1);
-            historyStack.push(snap);
-            if (historyStack.length > 50) {
-                historyStack.shift();
-            } else {
-                historyIndex++;
-            }
-            updateUndoRedoButtons();
-        };
-
-        function updateUndoRedoButtons() {
-            document.getElementById('btn-undo').disabled = (historyIndex <= 0);
-            document.getElementById('btn-redo').disabled = (historyIndex >= historyStack.length - 1);
-        }
-
-        window.undo = function() {
-            if (historyIndex <= 0) return;
-            historyIndex--;
-            restoreFromSnapshot(historyStack[historyIndex]);
-            showToast('↩ Undo');
-        };
-
-        window.redo = function() {
-            if (historyIndex >= historyStack.length - 1) return;
-            historyIndex++;
-            restoreFromSnapshot(historyStack[historyIndex]);
-            showToast('↪ Redo');
-        };
-
-        function restoreFromSnapshot(jsonSnap) {
-            isRestoringHistory = true;
-            const state = JSON.parse(jsonSnap);
-
-            const snapIds = new Set(state.layers.map(s => s.id));
-
-            // 1. Remove layers that no longer exist in this snapshot
-            layers.slice().forEach(existing => {
-                if (!snapIds.has(existing.id)) {
-                    transformControl.detach();
-                    if (existing.mesh) scene.remove(existing.mesh);
-                    if (existing.videoEl) {
-                        existing.videoEl.pause();
-                        existing.videoEl.remove();
-                    }
-                    layers = layers.filter(l => l.id !== existing.id);
-                }
-            });
-
-            // 2. Add or update layers to match the snapshot
-            const rebuiltLayers = [];
-            state.layers.forEach(snapLayer => {
-                let layer = layers.find(l => l.id === snapLayer.id);
-                if (!layer) {
-                    layer = createLayerObject(snapLayer);
-                    const srcToLoad = layer.localBlobUrl || cleanDropbox(layer.url);
-                    if (srcToLoad) applyMediaToLayer(layer, srcToLoad, true);
-                } else {
-                    const prevUrl = layer.url;
-                    const prevBlob = layer.localBlobUrl;
-                    layer.name = snapLayer.name;
-                    layer.url = snapLayer.url;
-                    layer.localBlobUrl = snapLayer.localBlobUrl;
-                    layer.pos = [...snapLayer.pos];
-                    layer.scale = [...snapLayer.scale];
-                    layer.rot = [...snapLayer.rot];
-                    layer.color = snapLayer.color;
-                    layer.similarity = snapLayer.similarity;
-                    layer.smoothness = snapLayer.smoothness;
-
-                    if (layer.mesh) {
-                        layer.mesh.position.set(...layer.pos);
-                        layer.mesh.scale.set(...layer.scale);
-                        layer.mesh.rotation.set(
-                            THREE.MathUtils.degToRad(layer.rot[0]),
-                            THREE.MathUtils.degToRad(layer.rot[1]),
-                            THREE.MathUtils.degToRad(layer.rot[2])
-                        );
-                        if (layer.type === 'chroma' && layer.mesh.material && layer.mesh.material.uniforms) {
-                            layer.mesh.material.uniforms.color.value.set(layer.color);
-                            layer.mesh.material.uniforms.similarity.value = layer.similarity;
-                            layer.mesh.material.uniforms.smoothness.value = layer.smoothness;
-                        }
-                    }
-                    if (prevUrl !== layer.url || prevBlob !== layer.localBlobUrl) {
-                        const srcToLoad = layer.localBlobUrl || cleanDropbox(layer.url);
-                        if (srcToLoad) applyMediaToLayer(layer, srcToLoad, true);
+        function setMeshOpacity(layer, val) {
+            if (!layer.mesh) return;
+            layer.mesh.traverse(child => {
+                if (child.isMesh && child.material) {
+                    child.material.transparent = true;
+                    if (child.material.uniforms && child.material.uniforms.opacity) {
+                        child.material.uniforms.opacity.value = val;
+                    } else {
+                        child.material.opacity = val;
                     }
                 }
-                rebuiltLayers.push(layer);
             });
-
-            layers = rebuiltLayers;
-            selectLayer(state.selectedId);
-            updateUndoRedoButtons();
-            isRestoringHistory = false;
         }
 
         // ============================================================================
-        // 4. TARGET IMAGE LOADER + IN-BROWSER .MIND COMPILER
+        // 3. MULTI-SELECT (CTRL / SHIFT) & FOLDER GROUPING ENGINE
         // ============================================================================
-        let activeTargetImageElement = null;
+        let layers = [];       // Holds both Media Layers and Folder Groups
+        let selectedIds = [];  // Supports Multi-Select!
+        let lastClickedId = null;
 
-        function cleanDropbox(url) {
-            if (!url) return '';
-            return url.trim()
-                .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
-                .replace('dropbox.com', 'dl.dropboxusercontent.com')
-                .replace(/[?&]dl=[01]/g, '');
+        function getPrimarySelectedItem() {
+            if (selectedIds.length === 0) return null;
+            return layers.find(l => l.id === selectedIds[selectedIds.length - 1]) || null;
         }
 
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.style.display = 'block';
-            clearTimeout(window._toastTimer);
-            window._toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3000);
-        }
+        // Group Selected Layers into a 3D Folder (Ctrl + G)
+        window.groupSelectedLayers = function() {
+            const validTargets = selectedIds
+                .map(id => layers.find(l => l.id === id))
+                .filter(l => l && !l.isFolder);
 
-        function applyTargetImageSource(srcUrl) {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => {
-                activeTargetImageElement = img;
-                const tex = new THREE.Texture(img);
-                tex.encoding = THREE.sRGBEncoding;
-                tex.needsUpdate = true;
-
-                const aspect = img.height / img.width;
-                targetMesh.geometry.dispose();
-                targetMesh.geometry = new THREE.PlaneGeometry(1, aspect);
-                targetMat.map = tex;
-                targetMat.needsUpdate = true;
-                showToast('✅ Target Image loaded onto 3D Floor! Ready to compile .mind');
-            };
-            img.onerror = () => {
-                showToast('❌ Could not load Target Image. Check link permissions.');
-            };
-            img.src = srcUrl;
-        }
-
-        document.getElementById('targetImgInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            applyTargetImageSource(URL.createObjectURL(file));
-        });
-
-        let targetUrlTimer = null;
-        window.loadTargetFromUrl = function() {
-            clearTimeout(targetUrlTimer);
-            const rawUrl = document.getElementById('targetImgUrlInput').value.trim();
-            if (!rawUrl) return;
-            targetUrlTimer = setTimeout(() => {
-                const directUrl = cleanDropbox(rawUrl);
-                showToast('⏳ Fetching Target Image from Dropbox...');
-                applyTargetImageSource(directUrl);
-            }, 400);
-        };
-
-        window.compileMindInBrowser = async function() {
-            if (!activeTargetImageElement) {
-                alert('First upload a Target Photo (Option A) or paste a Dropbox Image Link (Option B) so it appears on the 3D floor!');
-                return;
-            }
-            if (!window.MINDAR || !window.MINDAR.IMAGE || !window.MINDAR.IMAGE.Compiler) {
-                alert('MindAR Compiler module is still loading. Please wait 2 seconds and click again.');
+            if (validTargets.length < 1) {
+                alert('Ctrl+Click or Shift+Click at least 1 or more layers in the Hierarchy to group them into a Folder!');
                 return;
             }
 
-            const btn = document.getElementById('compileMindBtn');
-            const progWrap = document.getElementById('compileProgressWrap');
-            const progBar = document.getElementById('compileProgressBar');
-            const statusTxt = document.getElementById('compileStatusText');
+            const folderId = 'folder_' + Date.now();
+            const folderCount = layers.filter(l => l.isFolder).length + 1;
+            const folderGroup = new THREE.Group();
+            folderGroup.userData.layerId = folderId;
+            scene.add(folderGroup);
 
-            try {
-                btn.disabled = true;
-                progWrap.style.display = 'block';
-                statusTxt.style.display = 'block';
-                progBar.style.width = '2%';
-                statusTxt.textContent = 'Compiling .mind file (0%)...';
+            const folderObj = {
+                id: folderId,
+                name: `📁 Folder Group ${folderCount}`,
+                isFolder: true,
+                type: 'folder',
+                parentId: null,
+                pos: [0, 0, 0],
+                scale: [1, 1, 1],
+                rot: [0, 0, 0],
+                mesh: folderGroup
+            };
 
-                const compiler = new window.MINDAR.IMAGE.Compiler();
-                await compiler.compileImageTargets([activeTargetImageElement], (progress) => {
-                    const pct = Math.round(progress);
-                    progBar.style.width = pct + '%';
-                    statusTxt.textContent = `Compiling .mind tracker: ${pct}%`;
-                });
-
-                const exportedBuffer = await compiler.exportData();
-                const blob = new Blob([exportedBuffer], { type: 'application/octet-stream' });
-                const downloadUrl = URL.createObjectURL(blob);
-
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.download = 'targets.mind';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-
-                statusTxt.textContent = '✅ Compiled & Downloaded targets.mind! Upload it to Dropbox & paste link below.';
-                showToast('🎉 targets.mind compiled & downloaded!');
-            } catch (err) {
-                console.error(err);
-                statusTxt.textContent = '❌ Compile error: ' + err.message;
-            } finally {
-                btn.disabled = false;
-            }
-        };
-
-        // ============================================================================
-        // 5. CAMERA PRESETS, RAYCASTER & VIDEO TRANSPORT CONTROLS
-        // ============================================================================
-        window.setGizmoMode = function(mode) {
-            transformControl.setMode(mode);
-            document.getElementById('gizmo-translate').classList.toggle('active', mode === 'translate');
-            document.getElementById('gizmo-rotate').classList.toggle('active', mode === 'rotate');
-            document.getElementById('gizmo-scale').classList.toggle('active', mode === 'scale');
-        };
-
-        window.setCameraPreset = function(preset) {
-            camAnim = null;
-            orbit.target.set(0, 0, 0);
-            if (preset === 'front') {
-                camera.position.set(0, 0, 1.6);
-                camera.up.set(0, 1, 0);
-            } else if (preset === 'perspective') {
-                camera.position.set(0.8, -1.1, 1.2);
-                camera.up.set(0, 1, 0);
-            } else if (preset === 'side') {
-                camera.position.set(1.6, 0, 0.15);
-                camera.up.set(0, 1, 0);
-            } else if (preset === 'top') {
-                camera.position.set(0, -1.6, 0.2);
-                camera.up.set(0, 0, 1);
-            }
-            orbit.update();
-        };
-
-        // Video Play/Pause Controls
-        let globalVideosPlaying = true;
-
-        window.toggleAllVideos = function() {
-            globalVideosPlaying = !globalVideosPlaying;
-            layers.forEach(l => {
-                if (l.videoEl) {
-                    if (globalVideosPlaying) l.videoEl.play().catch(() => {});
-                    else l.videoEl.pause();
+            validTargets.forEach(child => {
+                child.parentId = folderId;
+                if (child.mesh) {
+                    folderGroup.attach(child.mesh); // Preserves world alignment while parenting!
+                    child.pos = [
+                        parseFloat(child.mesh.position.x.toFixed(3)),
+                        parseFloat(child.mesh.position.y.toFixed(3)),
+                        parseFloat(child.mesh.position.z.toFixed(3))
+                    ];
                 }
             });
-            document.getElementById('globalPlayPauseBtn').textContent = globalVideosPlaying ? '⏸ Pause Videos' : '▶️ Play Videos';
-            updateVideoTransportUI();
+
+            layers.push(folderObj);
+            selectSingleLayer(folderId);
+            saveHistoryState();
+            showToast(`📁 Grouped ${validTargets.length} layers into "${folderObj.name}"`);
         };
 
-        window.toggleSelectedVideo = function() {
-            const layer = layers.find(l => l.id === selectedId);
-            if (!layer || !layer.videoEl) {
-                alert('Load a video link or local video file into this layer first!');
+        window.ungroupSelectedFolder = function() {
+            const item = getPrimarySelectedItem();
+            if (!item) return;
+            const folder = item.isFolder ? item : layers.find(l => l.id === item.parentId);
+            if (!folder || !folder.isFolder) {
+                alert('Select a Folder Group (or a layer inside a folder) to ungroup it.');
                 return;
             }
-            if (layer.videoEl.paused) {
-                layer.videoEl.play().catch(() => {});
-            } else {
-                layer.videoEl.pause();
-            }
-            updateVideoTransportUI();
+
+            const children = layers.filter(l => l.parentId === folder.id);
+            children.forEach(ch => {
+                ch.parentId = null;
+                if (ch.mesh) {
+                    scene.attach(ch.mesh); // Preserves world position when ungrouping!
+                    ch.pos = [
+                        parseFloat(ch.mesh.position.x.toFixed(3)),
+                        parseFloat(ch.mesh.position.y.toFixed(3)),
+                        parseFloat(ch.mesh.position.z.toFixed(3))
+                    ];
+                    ch.scale = [
+                        parseFloat(ch.mesh.scale.x.toFixed(3)),
+                        parseFloat(ch.mesh.scale.y.toFixed(3)),
+                        parseFloat(ch.mesh.scale.z.toFixed(3))
+                    ];
+                    ch.rot = [
+                        parseFloat(THREE.MathUtils.radToDeg(ch.mesh.rotation.x).toFixed(1)),
+                        parseFloat(THREE.MathUtils.radToDeg(ch.mesh.rotation.y).toFixed(1)),
+                        parseFloat(THREE.MathUtils.radToDeg(ch.mesh.rotation.z).toFixed(1))
+                    ];
+                }
+            });
+
+            transformControl.detach();
+            scene.remove(folder.mesh);
+            layers = layers.filter(l => l.id !== folder.id);
+            selectedIds = children.map(c => c.id);
+            updateSelectionState();
+            saveHistoryState();
+            showToast('📂 Folder ungrouped');
         };
 
-        window.restartSelectedVideo = function() {
-            const layer = layers.find(l => l.id === selectedId);
-            if (!layer || !layer.videoEl) return;
-            layer.videoEl.currentTime = 0;
-            layer.videoEl.play().catch(() => {});
-            updateVideoTransportUI();
-        };
-
-        function updateVideoTransportUI() {
-            const layer = layers.find(l => l.id === selectedId);
-            const btn = document.getElementById('layerPlayPauseBtn');
-            if (!layer || !layer.videoEl) {
-                btn.textContent = '▶️ Play';
-                return;
-            }
-            btn.textContent = layer.videoEl.paused ? '▶️ Play' : '⏸ Pause';
+        // ============================================================================
+        // 4. UNIFIED MEDIA LAYER (AUTO-DETECTS MP4 / PNG / GLB, DEFAULTS TO 0, 0, 0)
+        // ============================================================================
+        function detectMediaType(urlOrFilename) {
+            const clean = urlOrFilename.split('?')[0].toLowerCase();
+            if (clean.endsWith('.glb') || clean.endsWith('.gltf')) return 'glb';
+            if (clean.endsWith('.png') || clean.endsWith('.jpg') || clean.endsWith('.jpeg') || clean.endsWith('.webp')) return 'image';
+            return 'video';
         }
 
-        // Raycaster Selection
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-        let downPos = { x: 0, y: 0 };
-
-        canvas.addEventListener('pointerdown', (e) => { downPos = { x: e.clientX, y: e.clientY }; });
-        canvas.addEventListener('pointerup', (e) => {
-            if (isSpacePressed) return;
-            if (Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 5) return;
-            const rect = canvas.getBoundingClientRect();
-            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-            raycaster.setFromCamera(mouse, camera);
-            const meshes = layers.map(l => l.mesh).filter(Boolean);
-            const intersects = raycaster.intersectObjects(meshes, true);
-
-            if (intersects.length > 0) {
-                let hitObj = intersects[0].object;
-                while (hitObj.parent && !hitObj.userData.layerId) {
-                    hitObj = hitObj.parent;
-                }
-                if (hitObj.userData.layerId) selectLayer(hitObj.userData.layerId);
-            }
-        });
-
-        // ============================================================================
-        // 6. LAYER CREATION & AUTO-FETCH DROPBOX PREVIEWS
-        // ============================================================================
-        let layers = [];
-        let selectedId = null;
-
-        function createChromaMaterial(texture, hexColor, similarity, smoothness) {
+        function createChromaMaterial(texture, hexColor, similarity, smoothness, enabled) {
             return new THREE.ShaderMaterial({
                 transparent: true,
                 side: THREE.DoubleSide,
@@ -849,7 +643,9 @@
                     src: { value: texture },
                     color: { value: new THREE.Color(hexColor) },
                     similarity: { value: similarity },
-                    smoothness: { value: smoothness }
+                    smoothness: { value: smoothness },
+                    enableChroma: { value: enabled ? 1.0 : 0.0 },
+                    opacity: { value: 1.0 }
                 },
                 vertexShader: `
                     varying vec2 vUv;
@@ -863,34 +659,40 @@
                     uniform vec3 color;
                     uniform float similarity;
                     uniform float smoothness;
+                    uniform float enableChroma;
+                    uniform float opacity;
                     varying vec2 vUv;
                     void main() {
                         vec4 texColor = texture2D(src, vUv);
-                        float Y1 = 0.2989 * texColor.r + 0.5866 * texColor.g + 0.1145 * texColor.b;
-                        float Cr1 = texColor.r - Y1;
-                        float Cb1 = texColor.b - Y1;
+                        if (enableChroma > 0.5) {
+                            float Y1 = 0.2989 * texColor.r + 0.5866 * texColor.g + 0.1145 * texColor.b;
+                            float Cr1 = texColor.r - Y1;
+                            float Cb1 = texColor.b - Y1;
 
-                        float Y2 = 0.2989 * color.r + 0.5866 * color.g + 0.1145 * color.b;
-                        float Cr2 = color.r - Y2;
-                        float Cb2 = color.b - Y2;
+                            float Y2 = 0.2989 * color.r + 0.5866 * color.g + 0.1145 * color.b;
+                            float Cr2 = color.r - Y2;
+                            float Cb2 = color.b - Y2;
 
-                        float blend = smoothstep(similarity, similarity + max(smoothness, 0.001), distance(vec2(Cr1, Cb1), vec2(Cr2, Cb2)));
-                        gl_FragColor = vec4(texColor.rgb * blend, texColor.a * blend);
+                            float blend = smoothstep(similarity, similarity + max(smoothness, 0.001), distance(vec2(Cr1, Cb1), vec2(Cr2, Cb2)));
+                            gl_FragColor = vec4(texColor.rgb * blend, texColor.a * blend * opacity);
+                        } else {
+                            gl_FragColor = vec4(texColor.rgb, texColor.a * opacity);
+                        }
                     }
                 `
             });
         }
 
-        function createPlaceholderTexture(label, borderHex) {
+        function createPlaceholderTexture(label) {
             const c = document.createElement('canvas');
             c.width = 512; c.height = 512;
             const ctx = c.getContext('2d');
             ctx.fillStyle = 'rgba(30, 32, 48, 0.85)'; ctx.fillRect(0, 0, 512, 512);
-            ctx.strokeStyle = borderHex; ctx.lineWidth = 10; ctx.strokeRect(5, 5, 502, 502);
-            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText(label, 256, 240);
-            ctx.fillStyle = '#a1a1aa'; ctx.font = '18px sans-serif';
-            ctx.fillText('Paste Dropbox Link in Inspector →', 256, 280);
+            ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 10; ctx.strokeRect(5, 5, 502, 502);
+            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(label, 256, 235);
+            ctx.fillStyle = '#a1a1aa'; ctx.font = '17px sans-serif';
+            ctx.fillText('Paste .mp4 / .png / .glb Link in Inspector →', 256, 275);
             return new THREE.CanvasTexture(c);
         }
 
@@ -898,32 +700,45 @@
             const layer = {
                 id: cfg.id,
                 name: cfg.name,
-                type: cfg.type,
+                isFolder: !!cfg.isFolder,
+                parentId: cfg.parentId || null,
+                type: cfg.type || 'video',
                 url: cfg.url || '',
                 localBlobUrl: cfg.localBlobUrl || '',
-                pos: [...cfg.pos],
-                scale: [...cfg.scale],
-                rot: [...cfg.rot],
+                pos: cfg.pos ? [...cfg.pos] : [0, 0, 0], // Default 0, 0, 0!
+                scale: cfg.scale ? [...cfg.scale] : [1, 1, 1],
+                rot: cfg.rot ? [...cfg.rot] : [0, 0, 0],
+                // Effects & Preset Animations
+                chromaEnabled: !!cfg.chromaEnabled,
                 color: cfg.color || '#00ff00',
                 similarity: cfg.similarity ?? 0.38,
                 smoothness: cfg.smoothness ?? 0.08,
+                portalMask: !!cfg.portalMask,
+                animPreset: cfg.animPreset || 'none',
+                animSpeed: cfg.animSpeed ?? 1.0,
+                animAmp: cfg.animAmp ?? 1.0,
+                // Runtime references
                 mesh: null,
-                videoEl: null
+                videoEl: null,
+                mixer: null,
+                clips: [],
+                activeAction: null,
+                duration: 0,
+                isPlaying: true
             };
 
-            if (layer.type === 'glb') {
-                const geo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-                const mat = new THREE.MeshStandardMaterial({ color: 0x8b5cf6, roughness: 0.3 });
-                layer.mesh = new THREE.Mesh(geo, mat);
+            if (layer.isFolder) {
+                const grp = new THREE.Group();
+                grp.userData.layerId = layer.id;
+                layer.mesh = grp;
             } else {
-                const borderCol = layer.type === 'chroma' ? '#10b981' : (layer.type === 'video' ? '#3b82f6' : '#f59e0b');
-                const tex = createPlaceholderTexture(layer.name, borderCol);
+                const tex = createPlaceholderTexture(layer.name);
                 const geo = new THREE.PlaneGeometry(1, 1);
                 const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
                 layer.mesh = new THREE.Mesh(geo, mat);
+                layer.mesh.userData.layerId = layer.id;
             }
 
-            layer.mesh.userData.layerId = layer.id;
             layer.mesh.position.set(...layer.pos);
             layer.mesh.scale.set(...layer.scale);
             layer.mesh.rotation.set(
@@ -931,72 +746,88 @@
                 THREE.MathUtils.degToRad(layer.rot[1]),
                 THREE.MathUtils.degToRad(layer.rot[2])
             );
+
             scene.add(layer.mesh);
             return layer;
         }
 
-        window.addLayer = function(type) {
+        window.addMediaLayer = function() {
             const id = 'layer_' + Date.now();
-            const count = layers.length + 1;
-            const zOffset = parseFloat((count * 0.06).toFixed(2));
+            const count = layers.filter(l => !l.isFolder).length + 1;
 
             const layer = createLayerObject({
                 id,
-                name: `${type.toUpperCase()} Layer ${count}`,
-                type,
-                url: '',
-                pos: [0, 0, zOffset],
+                name: `Layer ${count}`,
+                type: 'video',
+                pos: [0, 0, 0], // Always spawns at 0, 0, 0!
                 scale: [1, 1, 1],
-                rot: [0, 0, 0],
-                color: '#00ff00',
-                similarity: 0.38,
-                smoothness: 0.08
+                rot: [0, 0, 0]
             });
 
             layers.push(layer);
-            selectLayer(id);
+            selectSingleLayer(id);
             saveHistoryState();
-            showToast(`Added ${layer.name} at Z: ${zOffset}`);
+            showToast(`➕ Added "${layer.name}" at (0, 0, 0)`);
         };
 
-        function applyMediaToLayer(layer, mediaSourceUrl, silent = false) {
-            if (!mediaSourceUrl) return;
+        function applyMediaToLayer(layer, mediaSourceUrl, fileHint = '', silent = false) {
+            if (!mediaSourceUrl || layer.isFolder) return;
+
+            layer.type = detectMediaType(fileHint || layer.url || mediaSourceUrl);
             if (!silent) showToast(`⏳ Loading ${layer.type.toUpperCase()} preview...`);
 
-            if (layer.type === 'video' || layer.type === 'chroma') {
-                if (layer.videoEl) {
-                    layer.videoEl.pause();
-                    layer.videoEl.remove();
-                }
+            const parentContainer = (layer.parentId && layers.find(l => l.id === layer.parentId)?.mesh) || scene;
+
+            // Clean up previous video/mixer
+            if (layer.videoEl) {
+                layer.videoEl.pause();
+                layer.videoEl.remove();
+                layer.videoEl = null;
+            }
+            if (layer.mixer) {
+                layer.mixer.stopAllAction();
+                layer.mixer = null;
+                layer.clips = [];
+                layer.activeAction = null;
+            }
+
+            if (layer.type === 'video') {
                 const vid = document.createElement('video');
                 vid.crossOrigin = 'anonymous';
                 vid.src = mediaSourceUrl;
                 vid.loop = true;
                 vid.muted = true;
                 vid.playsInline = true;
-                if (globalVideosPlaying) vid.play().catch(() => {});
                 layer.videoEl = vid;
+                layer.isPlaying = globalPlaying;
+                if (globalPlaying) vid.play().catch(() => {});
 
                 const vidTex = new THREE.VideoTexture(vid);
                 vidTex.minFilter = THREE.LinearFilter;
                 vidTex.magFilter = THREE.LinearFilter;
 
+                // Ensure mesh is a Plane
+                if (layer.mesh.isGroup) {
+                    transformControl.detach();
+                    parentContainer.remove(layer.mesh);
+                    layer.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial());
+                    layer.mesh.userData.layerId = layer.id;
+                    parentContainer.add(layer.mesh);
+                }
+
                 vid.addEventListener('loadedmetadata', () => {
+                    layer.duration = vid.duration || 0;
                     if (vid.videoWidth && vid.videoHeight) {
                         const aspect = vid.videoHeight / vid.videoWidth;
                         layer.mesh.geometry.dispose();
                         layer.mesh.geometry = new THREE.PlaneGeometry(1, aspect);
-                        updateVideoTransportUI();
-                        if (!silent) showToast('✅ Video preview playing live in 3D Stage!');
                     }
+                    refreshInspectorUI();
+                    if (!silent) showToast('🎬 Video loaded onto 3D Stage!');
                 });
 
-                if (layer.type === 'chroma') {
-                    layer.mesh.material = createChromaMaterial(vidTex, layer.color, layer.similarity, layer.smoothness);
-                } else {
-                    layer.mesh.material = new THREE.MeshBasicMaterial({ map: vidTex, side: THREE.DoubleSide });
-                }
-                updateVideoTransportUI();
+                layer.mesh.material = createChromaMaterial(vidTex, layer.color, layer.similarity, layer.smoothness, layer.chromaEnabled);
+                applyPortalOrder(layer);
 
             } else if (layer.type === 'image') {
                 const img = new Image();
@@ -1006,10 +837,23 @@
                     tex.encoding = THREE.sRGBEncoding;
                     tex.needsUpdate = true;
                     const aspect = img.height / img.width;
-                    layer.mesh.geometry.dispose();
-                    layer.mesh.geometry = new THREE.PlaneGeometry(1, aspect);
-                    layer.mesh.material = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.02, side: THREE.DoubleSide });
-                    if (!silent) showToast('✅ Image layer loaded into 3D Stage!');
+
+                    if (layer.mesh.isGroup) {
+                        transformControl.detach();
+                        parentContainer.remove(layer.mesh);
+                        layer.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, aspect), new THREE.MeshBasicMaterial());
+                        layer.mesh.userData.layerId = layer.id;
+                        parentContainer.add(layer.mesh);
+                    } else {
+                        layer.mesh.geometry.dispose();
+                        layer.mesh.geometry = new THREE.PlaneGeometry(1, aspect);
+                    }
+
+                    layer.mesh.material = createChromaMaterial(tex, layer.color, layer.similarity, layer.smoothness, layer.chromaEnabled);
+                    layer.duration = 0;
+                    applyPortalOrder(layer);
+                    refreshInspectorUI();
+                    if (!silent) showToast('🖼️ Image loaded onto 3D Stage!');
                 };
                 img.src = mediaSourceUrl;
 
@@ -1018,7 +862,7 @@
                 loader.setCrossOrigin('anonymous');
                 loader.load(mediaSourceUrl, (gltf) => {
                     transformControl.detach();
-                    scene.remove(layer.mesh);
+                    parentContainer.remove(layer.mesh);
 
                     const model = gltf.scene;
                     const box = new THREE.Box3().setFromObject(model);
@@ -1039,42 +883,165 @@
                     );
 
                     layer.mesh = wrapper;
-                    scene.add(wrapper);
-                    if (selectedId === layer.id) transformControl.attach(wrapper);
-                    if (!silent) showToast('✅ 3D .glb Model loaded into 3D Stage!');
+                    parentContainer.add(wrapper);
+
+                    // Setup 3D Animation Scrubber if .glb has animations!
+                    if (gltf.animations && gltf.animations.length > 0) {
+                        layer.mixer = new THREE.AnimationMixer(model);
+                        layer.clips = gltf.animations;
+                        layer.activeAction = layer.mixer.clipAction(gltf.animations[0]);
+                        layer.activeAction.play();
+                        layer.duration = gltf.animations[0].duration || 1;
+                        layer.isPlaying = globalPlaying;
+                    } else {
+                        layer.duration = 0;
+                    }
+
+                    applyPortalOrder(layer);
+                    if (selectedIds.includes(layer.id)) transformControl.attach(wrapper);
+                    refreshInspectorUI();
+                    if (!silent) showToast('🧊 3D .glb Model loaded!');
                 });
             }
         }
 
-        window.handleLocalFile = function(e) {
-            const file = e.target.files[0];
-            const layer = layers.find(l => l.id === selectedId);
-            if (!file || !layer) return;
-            layer.localBlobUrl = URL.createObjectURL(file);
-            applyMediaToLayer(layer, layer.localBlobUrl);
-            saveHistoryState();
-        };
+        function applyPortalOrder(layer) {
+            if (!layer.mesh) return;
+            layer.mesh.renderOrder = layer.portalMask ? 1 : 2;
+        }
 
-        let urlFetchTimer = null;
-        window.handleDropboxUrl = function() {
-            const layer = layers.find(l => l.id === selectedId);
-            if (!layer) return;
-            layer.url = document.getElementById('inpUrl').value.trim();
-            clearTimeout(urlFetchTimer);
-            if (layer.url) {
-                urlFetchTimer = setTimeout(() => {
-                    applyMediaToLayer(layer, cleanDropbox(layer.url));
-                    saveHistoryState();
-                }, 400);
+        // ============================================================================
+        // 5. TIMELINE PLAYHEAD SCRUBBER (FOR BOTH VIDEOS & 3D .GLB ANIMATIONS!)
+        // ============================================================================
+        function updatePlayheadUI() {
+            const layer = getPrimarySelectedItem();
+            if (!layer || layer.isFolder) return;
+            const scrubber = document.getElementById('timelineScrubber');
+            const display = document.getElementById('timecodeDisplay');
+
+            if (layer.type === 'video' && layer.videoEl && layer.duration > 0) {
+                const cur = layer.videoEl.currentTime || 0;
+                scrubber.max = layer.duration;
+                if (document.activeElement !== scrubber) {
+                    scrubber.value = cur;
+                }
+                display.textContent = `${cur.toFixed(2)}s / ${layer.duration.toFixed(2)}s`;
+            } else if (layer.type === 'glb' && layer.mixer && layer.activeAction && layer.duration > 0) {
+                const cur = layer.activeAction.time || 0;
+                scrubber.max = layer.duration;
+                if (document.activeElement !== scrubber) {
+                    scrubber.value = cur;
+                }
+                display.textContent = `${cur.toFixed(2)}s / ${layer.duration.toFixed(2)}s`;
             }
+        }
+
+        window.scrubTimeline = function(val) {
+            const layer = getPrimarySelectedItem();
+            if (!layer) return;
+            const timeSec = parseFloat(val) || 0;
+
+            if (layer.type === 'video' && layer.videoEl) {
+                layer.videoEl.pause();
+                layer.isPlaying = false;
+                layer.videoEl.currentTime = timeSec;
+                document.getElementById('layerPlayPauseBtn').textContent = '▶️️ Play';
+            } else if (layer.type === 'glb' && layer.mixer && layer.activeAction) {
+                layer.isPlaying = false;
+                layer.activeAction.paused = false;
+                layer.mixer.setTime(timeSec);
+                document.getElementById('layerPlayPauseBtn').textContent = '▶️ Play';
+            }
+            document.getElementById('timecodeDisplay').textContent = `${timeSec.toFixed(2)}s / ${layer.duration.toFixed(2)}s`;
         };
 
-        window.selectLayer = function(id) {
-            selectedId = id;
-            renderLayerList();
-            const layer = layers.find(l => l.id === id);
+        window.toggleSelectedMediaPlayback = function() {
+            const layer = getPrimarySelectedItem();
+            if (!layer) return;
 
-            if (!layer) {
+            if (layer.type === 'video' && layer.videoEl) {
+                if (layer.videoEl.paused) {
+                    layer.videoEl.play().catch(() => {});
+                    layer.isPlaying = true;
+                } else {
+                    layer.videoEl.pause();
+                    layer.isPlaying = false;
+                }
+            } else if (layer.type === 'glb' && layer.mixer) {
+                layer.isPlaying = !layer.isPlaying;
+            }
+            document.getElementById('layerPlayPauseBtn').textContent = layer.isPlaying ? '⏸ Pause' : '▶️ Play';
+        };
+
+        window.restartSelectedMedia = function() {
+            scrubTimeline(0);
+        };
+
+        window.changeGlbClip = function() {
+            const layer = getPrimarySelectedItem();
+            if (!layer || !layer.mixer || !layer.clips.length) return;
+            const idx = parseInt(document.getElementById('glbClipSelect').value, 10) || 0;
+            const clip = layer.clips[idx];
+            if (!clip) return;
+            layer.mixer.stopAllAction();
+            layer.activeAction = layer.mixer.clipAction(clip);
+            layer.activeAction.play();
+            layer.duration = clip.duration || 1;
+            layer.isPlaying = true;
+        };
+
+        window.toggleAllPlayback = function() {
+            globalPlaying = !globalPlaying;
+            layers.forEach(l => {
+                l.isPlaying = globalPlaying;
+                if (l.videoEl) {
+                    if (globalPlaying) l.videoEl.play().catch(() => {});
+                    else l.videoEl.pause();
+                }
+            });
+            document.getElementById('globalPlayPauseBtn').textContent = globalPlaying ? '⏸ Pause All' : '▶️ Play All';
+            refreshInspectorUI();
+        };
+
+        // ============================================================================
+        // 6. SELECTION, INSPECTOR SYNC & KEYBOARD SHORTCUTS
+        // ============================================================================
+        window.selectSingleLayer = function(id) {
+            selectedIds = id ? [id] : [];
+            lastClickedId = id;
+            updateSelectionState();
+        };
+
+        window.handleLayerClick = function(id, event) {
+            if (event && (event.ctrlKey || event.metaKey)) {
+                // Toggle in multi-selection
+                if (selectedIds.includes(id)) {
+                    selectedIds = selectedIds.filter(x => x !== id);
+                } else {
+                    selectedIds.push(id);
+                }
+                lastClickedId = id;
+            } else if (event && event.shiftKey && lastClickedId) {
+                // Range Shift-Select
+                const allIds = layers.map(l => l.id);
+                const start = allIds.indexOf(lastClickedId);
+                const end = allIds.indexOf(id);
+                if (start !== -1 && end !== -1) {
+                    const [low, high] = start < end ? [start, end] : [end, start];
+                    selectedIds = allIds.slice(low, high + 1);
+                }
+            } else {
+                selectedIds = [id];
+                lastClickedId = id;
+            }
+            updateSelectionState();
+        };
+
+        function updateSelectionState() {
+            renderLayerList();
+            const primary = getPrimarySelectedItem();
+
+            if (!primary) {
                 transformControl.detach();
                 document.getElementById('inspectorEmpty').style.display = 'block';
                 document.getElementById('inspectorControls').style.display = 'none';
@@ -1087,28 +1054,59 @@
             document.getElementById('inspectorFocusBtn').style.display = 'inline-block';
             document.getElementById('inpLocalFile').value = '';
 
-            if (layer.mesh) transformControl.attach(layer.mesh);
+            if (primary.mesh) transformControl.attach(primary.mesh);
+            refreshInspectorUI();
+        }
+
+        function refreshInspectorUI() {
+            const layer = getPrimarySelectedItem();
+            if (!layer) return;
 
             document.getElementById('inpName').value = layer.name;
-            document.getElementById('inpUrl').value = layer.url;
+            document.getElementById('mediaSourceCard').style.display = layer.isFolder ? 'none' : 'block';
+            if (!layer.isFolder) {
+                document.getElementById('inpUrl').value = layer.url;
+            }
+
             populateInspectorNumbers(layer);
 
-            const isVid = (layer.type === 'video' || layer.type === 'chroma');
-            document.getElementById('videoTransportBox').style.display = isVid ? 'block' : 'none';
-            if (isVid) updateVideoTransportUI();
+            // Timeline Playhead visibility (shown for Video OR Animated .glb)
+            const hasTimeline = !layer.isFolder && ((layer.type === 'video' && layer.videoEl) || (layer.type === 'glb' && layer.clips && layer.clips.length > 0));
+            document.getElementById('timelineCard').style.display = hasTimeline ? 'block' : 'none';
+            if (hasTimeline) {
+                document.getElementById('timelineLabel').textContent = layer.type === 'glb' ? '🧊 3D Animation Playhead' : '🎬 Video Frame Scrubber';
+                document.getElementById('layerPlayPauseBtn').textContent = layer.isPlaying ? '⏸ Pause' : '▶️ Play';
 
-            const chromaBox = document.getElementById('chromaBox');
-            if (layer.type === 'chroma') {
-                chromaBox.style.display = 'block';
-                document.getElementById('chromaColor').value = layer.color;
-                document.getElementById('chromaSim').value = layer.similarity;
-                document.getElementById('chromaSmooth').value = layer.smoothness;
-                document.getElementById('simVal').textContent = layer.similarity;
-                document.getElementById('smoothVal').textContent = layer.smoothness;
-            } else {
-                chromaBox.style.display = 'none';
+                const clipRow = document.getElementById('glbClipRow');
+                if (layer.type === 'glb' && layer.clips.length > 0) {
+                    clipRow.style.display = 'block';
+                    const sel = document.getElementById('glbClipSelect');
+                    sel.innerHTML = layer.clips.map((c, i) => `<option value="${i}">${c.name || ('Clip ' + (i+1))}</option>`).join('');
+                } else {
+                    clipRow.style.display = 'none';
+                }
             }
-        };
+
+            // Preset Animations & Effects
+            document.getElementById('animPreset').value = layer.animPreset || 'none';
+            document.getElementById('animParamsBox').style.display = (layer.animPreset && layer.animPreset !== 'none') ? 'block' : 'none';
+            document.getElementById('animSpeed').value = layer.animSpeed ?? 1.0;
+            document.getElementById('animAmp').value = layer.animAmp ?? 1.0;
+            document.getElementById('animSpeedVal').textContent = layer.animSpeed ?? 1.0;
+            document.getElementById('animAmpVal').textContent = layer.animAmp ?? 1.0;
+
+            document.getElementById('portalToggle').checked = !!layer.portalMask;
+
+            const chromaSec = document.getElementById('chromaEffectSection');
+            chromaSec.style.display = (!layer.isFolder && (layer.type === 'video' || layer.type === 'image')) ? 'block' : 'none';
+            document.getElementById('chromaToggle').checked = !!layer.chromaEnabled;
+            document.getElementById('chromaParamsBox').style.display = layer.chromaEnabled ? 'block' : 'none';
+            document.getElementById('chromaColor').value = layer.color || '#00ff00';
+            document.getElementById('chromaSim').value = layer.similarity ?? 0.38;
+            document.getElementById('chromaSmooth').value = layer.smoothness ?? 0.08;
+            document.getElementById('simVal').textContent = layer.similarity ?? 0.38;
+            document.getElementById('smoothVal').textContent = layer.smoothness ?? 0.08;
+        }
 
         function populateInspectorNumbers(layer) {
             document.getElementById('posX').value = layer.pos[0];
@@ -1123,14 +1121,14 @@
         }
 
         window.syncUIFromInspector = function() {
-            const layer = layers.find(l => l.id === selectedId);
+            const layer = getPrimarySelectedItem();
             if (!layer) return;
             layer.name = document.getElementById('inpName').value;
             renderLayerList();
         };
 
         window.syncTransformFromInputs = function() {
-            const layer = layers.find(l => l.id === selectedId);
+            const layer = getPrimarySelectedItem();
             if (!layer || !layer.mesh) return;
 
             layer.pos = [
@@ -1159,38 +1157,94 @@
             renderLayerList();
         };
 
-        window.syncChromaFromInputs = function() {
-            const layer = layers.find(l => l.id === selectedId);
-            if (!layer || layer.type !== 'chroma') return;
+        window.syncEffectsFromInputs = function() {
+            const layer = getPrimarySelectedItem();
+            if (!layer) return;
 
+            layer.animPreset = document.getElementById('animPreset').value;
+            layer.animSpeed = parseFloat(document.getElementById('animSpeed').value) || 1.0;
+            layer.animAmp = parseFloat(document.getElementById('animAmp').value) || 1.0;
+            document.getElementById('animParamsBox').style.display = (layer.animPreset !== 'none') ? 'block' : 'none';
+            document.getElementById('animSpeedVal').textContent = layer.animSpeed;
+            document.getElementById('animAmpVal').textContent = layer.animAmp;
+
+            // Reset mesh to exact base transform if animation turned off
+            if (layer.animPreset === 'none' && layer.mesh) {
+                layer.mesh.position.set(...layer.pos);
+                layer.mesh.scale.set(...layer.scale);
+                layer.mesh.rotation.set(
+                    THREE.MathUtils.degToRad(layer.rot[0]),
+                    THREE.MathUtils.degToRad(layer.rot[1]),
+                    THREE.MathUtils.degToRad(layer.rot[2])
+                );
+            }
+
+            layer.portalMask = document.getElementById('portalToggle').checked;
+            applyPortalOrder(layer);
+
+            layer.chromaEnabled = document.getElementById('chromaToggle').checked;
+            document.getElementById('chromaParamsBox').style.display = layer.chromaEnabled ? 'block' : 'none';
             layer.color = document.getElementById('chromaColor').value;
             layer.similarity = parseFloat(document.getElementById('chromaSim').value);
             layer.smoothness = parseFloat(document.getElementById('chromaSmooth').value);
-
             document.getElementById('simVal').textContent = layer.similarity;
             document.getElementById('smoothVal').textContent = layer.smoothness;
 
             if (layer.mesh && layer.mesh.material && layer.mesh.material.uniforms) {
+                layer.mesh.material.uniforms.enableChroma.value = layer.chromaEnabled ? 1.0 : 0.0;
                 layer.mesh.material.uniforms.color.value.set(layer.color);
                 layer.mesh.material.uniforms.similarity.value = layer.similarity;
                 layer.mesh.material.uniforms.smoothness.value = layer.smoothness;
             }
         };
 
-        window.deleteSelectedLayer = function() {
-            if (!selectedId) return;
-            const layer = layers.find(l => l.id === selectedId);
-            if (layer) {
-                transformControl.detach();
-                if (layer.mesh) scene.remove(layer.mesh);
+        window.handleLocalFile = function(e) {
+            const file = e.target.files[0];
+            const layer = getPrimarySelectedItem();
+            if (!file || !layer) return;
+            layer.localBlobUrl = URL.createObjectURL(file);
+            applyMediaToLayer(layer, layer.localBlobUrl, file.name);
+            saveHistoryState();
+        };
+
+        let urlFetchTimer = null;
+        window.handleDropboxUrl = function() {
+            const layer = getPrimarySelectedItem();
+            if (!layer) return;
+            layer.url = document.getElementById('inpUrl').value.trim();
+            clearTimeout(urlFetchTimer);
+            if (layer.url) {
+                urlFetchTimer = setTimeout(() => {
+                    applyMediaToLayer(layer, cleanDropbox(layer.url), layer.url);
+                    saveHistoryState();
+                }, 400);
+            }
+        };
+
+        window.deleteSelectedLayers = function() {
+            if (selectedIds.length === 0) return;
+            transformControl.detach();
+
+            selectedIds.forEach(id => {
+                const layer = layers.find(l => l.id === id);
+                if (!layer) return;
+                if (layer.isFolder) {
+                    // Release children back to scene root
+                    layers.filter(c => c.parentId === layer.id).forEach(ch => {
+                        ch.parentId = null;
+                        if (ch.mesh) scene.attach(ch.mesh);
+                    });
+                }
+                if (layer.mesh && layer.mesh.parent) layer.mesh.parent.remove(layer.mesh);
                 if (layer.videoEl) {
                     layer.videoEl.pause();
                     layer.videoEl.remove();
                 }
-            }
-            layers = layers.filter(l => l.id !== selectedId);
-            selectedId = layers.length ? layers[layers.length - 1].id : null;
-            selectLayer(selectedId);
+            });
+
+            layers = layers.filter(l => !selectedIds.includes(l.id));
+            selectedIds = layers.length ? [layers[layers.length - 1].id] : [];
+            updateSelectionState();
             saveHistoryState();
         };
 
@@ -1201,71 +1255,434 @@
                 return;
             }
             list.innerHTML = '';
-            layers.forEach(l => {
-                const item = document.createElement('div');
-                item.className = 'layer-item' + (l.id === selectedId ? ' active' : '');
 
-                const titleSpan = document.createElement('span');
-                titleSpan.textContent = l.name;
-                titleSpan.style.flex = '1';
-
-                const rightGroup = document.createElement('div');
-                rightGroup.style.display = 'flex';
-                rightGroup.style.alignItems = 'center';
-
-                const zBadge = document.createElement('small');
-                zBadge.style.color = '#a78bfa';
-                zBadge.textContent = `Z: ${l.pos[2]}`;
-
-                const findBtn = document.createElement('button');
-                findBtn.className = 'layer-focus-btn';
-                findBtn.title = 'Move Camera to this Layer (F)';
-                findBtn.textContent = '🎯';
-                findBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    focusSelectedLayer(l.id);
-                };
-
-                rightGroup.appendChild(zBadge);
-                rightGroup.appendChild(findBtn);
-
-                item.appendChild(titleSpan);
-                item.appendChild(rightGroup);
-                item.onclick = () => selectLayer(l.id);
-                list.appendChild(item);
+            // Render Top-Level Items and Folder Children cleanly
+            const topLevel = layers.filter(l => !l.parentId);
+            topLevel.forEach(item => {
+                appendHierarchyRow(list, item, false);
+                if (item.isFolder) {
+                    layers.filter(ch => ch.parentId === item.id).forEach(child => {
+                        appendHierarchyRow(list, child, true);
+                    });
+                }
             });
         }
+
+        function appendHierarchyRow(containerEl, l, isChild) {
+            const item = document.createElement('div');
+            const isPrimary = (selectedIds[selectedIds.length - 1] === l.id);
+            const isMulti = selectedIds.includes(l.id);
+
+            item.className = 'layer-item' + (isPrimary ? ' active' : (isMulti ? ' multi-selected' : '')) + (isChild ? ' child-layer' : '');
+
+            const icon = l.isFolder ? '' : (l.type === 'glb' ? '🧊 ' : (l.type === 'image' ? '🖼️ ' : '🎬 '));
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = icon + l.name;
+            titleSpan.style.flex = '1';
+
+            const rightGroup = document.createElement('div');
+            rightGroup.style.display = 'flex';
+            rightGroup.style.alignItems = 'center';
+
+            const zBadge = document.createElement('small');
+            zBadge.style.color = l.portalMask ? '#38bdf8' : '#a78bfa';
+            zBadge.textContent = `${l.portalMask ? '🕳️ ' : ''}Z: ${l.pos[2]}`;
+
+            const findBtn = document.createElement('button');
+            findBtn.className = 'layer-focus-btn';
+            findBtn.title = 'Focus in Viewport (F)';
+            findBtn.textContent = '🎯';
+            findBtn.onclick = (e) => {
+                e.stopPropagation();
+                selectSingleLayer(l.id);
+                focusSelectedLayer();
+            };
+
+            rightGroup.appendChild(zBadge);
+            rightGroup.appendChild(findBtn);
+
+            item.appendChild(titleSpan);
+            item.appendChild(rightGroup);
+            item.onclick = (e) => handleLayerClick(l.id, e);
+            containerEl.appendChild(item);
+        }
+
+        // ============================================================================
+        // 7. SHORTCUTS, SPACEBAR PANNING, FOCUS (F) & UNDO/REDO
+        // ============================================================================
+        let isSpacePressed = false;
+
+        window.addEventListener('keydown', (e) => {
+            const activeTag = document.activeElement ? document.activeElement.tagName : '';
+            const isTyping = (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT');
+
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) redo();
+                else undo();
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+                e.preventDefault();
+                redo();
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+                e.preventDefault();
+                groupSelectedLayers();
+                return;
+            }
+
+            if (isTyping) return;
+
+            if (e.code === 'Space' && !isSpacePressed) {
+                e.preventDefault();
+                isSpacePressed = true;
+                container.classList.add('space-pan');
+                orbit.mouseButtons.LEFT = THREE.MOUSE.PAN;
+                return;
+            }
+
+            const key = e.key.toLowerCase();
+            if (key === 'w') setGizmoMode('translate');
+            if (key === 'e') setGizmoMode('rotate');
+            if (key === 'r') setGizmoMode('scale');
+            if (key === 'f') {
+                e.preventDefault();
+                focusSelectedLayer();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                isSpacePressed = false;
+                container.classList.remove('space-pan');
+                orbit.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+            }
+        });
+
+        window.focusSelectedLayer = function() {
+            const layer = getPrimarySelectedItem();
+            if (!layer || !layer.mesh) {
+                camAnim = {
+                    progress: 0,
+                    startPos: camera.position.clone(),
+                    startTarget: orbit.target.clone(),
+                    endTarget: new THREE.Vector3(0, 0, 0),
+                    endPos: new THREE.Vector3(0, -0.9, 1.4)
+                };
+                showToast('🎯 Focused on Target Floor');
+                return;
+            }
+
+            const box = new THREE.Box3().setFromObject(layer.mesh);
+            const center = new THREE.Vector3();
+            const size = new THREE.Vector3();
+            box.getCenter(center);
+            box.getSize(size);
+
+            const maxDim = Math.max(size.x, size.y, size.z, 0.4);
+            const fitDistance = maxDim * 1.65;
+
+            const dir = camera.position.clone().sub(orbit.target);
+            if (dir.lengthSq() < 0.01) dir.set(0, -0.5, 1);
+            dir.normalize();
+
+            camAnim = {
+                progress: 0,
+                startPos: camera.position.clone(),
+                startTarget: orbit.target.clone(),
+                endTarget: center,
+                endPos: center.clone().add(dir.multiplyScalar(fitDistance))
+            };
+            showToast(`🎯 Focused on "${layer.name}"`);
+        };
+
+        // Undo / Redo Stack
+        let historyStack = [];
+        let historyIndex = -1;
+        let isRestoringHistory = false;
+
+        function serializeSceneState() {
+            return JSON.stringify({
+                selectedIds,
+                layers: layers.map(l => ({
+                    id: l.id,
+                    name: l.name,
+                    isFolder: l.isFolder,
+                    parentId: l.parentId,
+                    type: l.type,
+                    url: l.url,
+                    localBlobUrl: l.localBlobUrl || '',
+                    pos: [...l.pos],
+                    scale: [...l.scale],
+                    rot: [...l.rot],
+                    chromaEnabled: l.chromaEnabled,
+                    color: l.color,
+                    similarity: l.similarity,
+                    smoothness: l.smoothness,
+                    portalMask: l.portalMask,
+                    animPreset: l.animPreset,
+                    animSpeed: l.animSpeed,
+                    animAmp: l.animAmp
+                }))
+            });
+        }
+
+        window.saveHistoryState = function() {
+            if (isRestoringHistory) return;
+            const snap = serializeSceneState();
+            if (historyIndex >= 0 && historyStack[historyIndex] === snap) return;
+
+            historyStack = historyStack.slice(0, historyIndex + 1);
+            historyStack.push(snap);
+            if (historyStack.length > 50) historyStack.shift();
+            else historyIndex++;
+            updateUndoRedoButtons();
+        };
+
+        function updateUndoRedoButtons() {
+            document.getElementById('btn-undo').disabled = (historyIndex <= 0);
+            document.getElementById('btn-redo').disabled = (historyIndex >= historyStack.length - 1);
+        }
+
+        window.undo = function() {
+            if (historyIndex <= 0) return;
+            historyIndex--;
+            restoreFromSnapshot(historyStack[historyIndex]);
+            showToast('↩ Undo');
+        };
+
+        window.redo = function() {
+            if (historyIndex >= historyStack.length - 1) return;
+            historyIndex++;
+            restoreFromSnapshot(historyStack[historyIndex]);
+            showToast('↪ Redo');
+        };
+
+        function restoreFromSnapshot(jsonSnap) {
+            isRestoringHistory = true;
+            const state = JSON.parse(jsonSnap);
+            transformControl.detach();
+
+            // Clear current meshes
+            layers.forEach(l => {
+                if (l.mesh && l.mesh.parent) l.mesh.parent.remove(l.mesh);
+                if (l.videoEl) { l.videoEl.pause(); l.videoEl.remove(); }
+            });
+            layers = [];
+
+            // Rebuild folders first, then media layers
+            state.layers.filter(s => s.isFolder).forEach(s => layers.push(createLayerObject(s)));
+            state.layers.filter(s => !s.isFolder).forEach(s => {
+                const l = createLayerObject(s);
+                if (l.parentId) {
+                    const parentFolder = layers.find(f => f.id === l.parentId);
+                    if (parentFolder && parentFolder.mesh) parentFolder.mesh.add(l.mesh);
+                }
+                const src = l.localBlobUrl || cleanDropbox(l.url);
+                if (src) applyMediaToLayer(l, src, l.url, true);
+                layers.push(l);
+            });
+
+            selectedIds = state.selectedIds || [];
+            updateSelectionState();
+            updateUndoRedoButtons();
+            isRestoringHistory = false;
+        }
+
+        // ============================================================================
+        // 8. TARGET IMAGE, .MIND COMPILER, RAYCASTER & EXPORT
+        // ============================================================================
+        let activeTargetImageElement = null;
+
+        function cleanDropbox(url) {
+            if (!url) return '';
+            return url.trim()
+                .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+                .replace('dropbox.com', 'dl.dropboxusercontent.com')
+                .replace(/[?&]dl=[01]/g, '');
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.display = 'block';
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3000);
+        }
+
+        function applyTargetImageSource(srcUrl) {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                activeTargetImageElement = img;
+                const tex = new THREE.Texture(img);
+                tex.encoding = THREE.sRGBEncoding;
+                tex.needsUpdate = true;
+
+                currentTargetAspect = parseFloat((img.height / img.width).toFixed(4));
+                targetMesh.geometry.dispose();
+                targetMesh.geometry = new THREE.PlaneGeometry(1, currentTargetAspect);
+                targetMat.map = tex;
+                targetMat.needsUpdate = true;
+                rebuildPortalMask(currentTargetAspect);
+                showToast('✅ Target Image applied to 3D Floor!');
+            };
+            img.src = srcUrl;
+        }
+
+        document.getElementById('targetImgInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) applyTargetImageSource(URL.createObjectURL(file));
+        });
+
+        let targetUrlTimer = null;
+        window.loadTargetFromUrl = function() {
+            clearTimeout(targetUrlTimer);
+            const rawUrl = document.getElementById('targetImgUrlInput').value.trim();
+            if (!rawUrl) return;
+            targetUrlTimer = setTimeout(() => applyTargetImageSource(cleanDropbox(rawUrl)), 400);
+        };
+
+        window.compileMindInBrowser = async function() {
+            if (!activeTargetImageElement) {
+                alert('First upload a Target Photo or paste a Dropbox Image Link in Step 1!');
+                return;
+            }
+            const btn = document.getElementById('compileMindBtn');
+            const progWrap = document.getElementById('compileProgressWrap');
+            const progBar = document.getElementById('compileProgressBar');
+            const statusTxt = document.getElementById('compileStatusText');
+
+            try {
+                btn.disabled = true;
+                progWrap.style.display = 'block';
+                statusTxt.style.display = 'block';
+                const compiler = new window.MINDAR.IMAGE.Compiler();
+                await compiler.compileImageTargets([activeTargetImageElement], (progress) => {
+                    const pct = Math.round(progress);
+                    progBar.style.width = pct + '%';
+                    statusTxt.textContent = `Compiling .mind tracker: ${pct}%`;
+                });
+                const exportedBuffer = await compiler.exportData();
+                const blob = new Blob([exportedBuffer], { type: 'application/octet-stream' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'targets.mind';
+                a.click();
+                statusTxt.textContent = '✅ Compiled targets.mind! Upload to Dropbox & paste link below.';
+            } catch (err) {
+                statusTxt.textContent = '❌ Error: ' + err.message;
+            } finally {
+                btn.disabled = false;
+            }
+        };
+
+        window.setGizmoMode = function(mode) {
+            transformControl.setMode(mode);
+            document.getElementById('gizmo-translate').classList.toggle('active', mode === 'translate');
+            document.getElementById('gizmo-rotate').classList.toggle('active', mode === 'rotate');
+            document.getElementById('gizmo-scale').classList.toggle('active', mode === 'scale');
+        };
+
+        window.setCameraPreset = function(preset) {
+            camAnim = null;
+            orbit.target.set(0, 0, 0);
+            if (preset === 'front') { camera.position.set(0, 0, 1.6); camera.up.set(0, 1, 0); }
+            else if (preset === 'perspective') { camera.position.set(0.8, -1.1, 1.2); camera.up.set(0, 1, 0); }
+            else if (preset === 'side') { camera.position.set(1.6, 0, 0.15); camera.up.set(0, 1, 0); }
+            else if (preset === 'top') { camera.position.set(0, -1.6, 0.2); camera.up.set(0, 0, 1); }
+            orbit.update();
+        };
+
+        // Raycaster Click Selection in Viewport
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let downPos = { x: 0, y: 0 };
+
+        canvas.addEventListener('pointerdown', (e) => { downPos = { x: e.clientX, y: e.clientY }; });
+        canvas.addEventListener('pointerup', (e) => {
+            if (isSpacePressed || Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 5) return;
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const meshes = layers.filter(l => !l.isFolder && l.mesh).map(l => l.mesh);
+            const intersects = raycaster.intersectObjects(meshes, true);
+
+            if (intersects.length > 0) {
+                let hitObj = intersects[0].object;
+                while (hitObj.parent && !hitObj.userData.layerId) hitObj = hitObj.parent;
+                if (hitObj.userData.layerId) handleLayerClick(hitObj.userData.layerId, e);
+            }
+        });
 
         window.exportProject = function() {
             const mind = document.getElementById('mindUrlInput').value.trim();
             if (!mind) {
-                alert('Please paste your Dropbox .mind file link in Step 1! (If you haven\'t compiled it yet, click "Compile & Download .mind File", upload it to Dropbox, and paste its link there).');
+                alert('Please paste your Dropbox .mind file link in Step 1!');
                 return;
             }
-            if (layers.length === 0) {
-                alert('Please add at least one 3D layer in Step 2!');
+            const mediaLayers = layers.filter(l => !l.isFolder);
+            if (mediaLayers.length === 0) {
+                alert('Please add at least one Media Layer!');
                 return;
             }
-            const missingUrl = layers.find(l => !l.url);
+            const missingUrl = mediaLayers.find(l => !l.url);
             if (missingUrl) {
-                alert(`Please paste the Dropbox Share Link for "${missingUrl.name}" in the Inspector so phones can load it!`);
-                selectLayer(missingUrl.id);
+                alert(`Please paste the Dropbox link for "${missingUrl.name}" in the Inspector!`);
+                selectSingleLayer(missingUrl.id);
                 return;
             }
 
-            const cleanConfig = {
-                m: mind,
-                l: layers.map(l => ({
-                    t: l.type,
+            // Export World Transforms (so grouped folder transforms bake cleanly for the player!)
+            const exportedLayers = mediaLayers.map(l => {
+                // Temporarily reset preset animation offset before reading world matrix
+                if (l.mesh) {
+                    l.mesh.position.set(...l.pos);
+                    l.mesh.scale.set(...l.scale);
+                    l.mesh.rotation.set(
+                        THREE.MathUtils.degToRad(l.rot[0]),
+                        THREE.MathUtils.degToRad(l.rot[1]),
+                        THREE.MathUtils.degToRad(l.rot[2])
+                    );
+                    l.mesh.updateMatrixWorld(true);
+                }
+
+                const worldPos = new THREE.Vector3();
+                const worldQuat = new THREE.Quaternion();
+                const worldScale = new THREE.Vector3();
+                l.mesh.matrixWorld.decompose(worldPos, worldQuat, worldScale);
+                const worldEuler = new THREE.Euler().setFromQuaternion(worldQuat);
+
+                return {
+                    t: l.chromaEnabled ? 'chroma' : l.type,
                     u: l.url,
-                    p: l.pos,
-                    s: l.scale,
-                    r: l.rot,
+                    p: [parseFloat(worldPos.x.toFixed(3)), parseFloat(worldPos.y.toFixed(3)), parseFloat(worldPos.z.toFixed(3))],
+                    s: [parseFloat(worldScale.x.toFixed(3)), parseFloat(worldScale.y.toFixed(3)), parseFloat(worldScale.z.toFixed(3))],
+                    r: [
+                        parseFloat(THREE.MathUtils.radToDeg(worldEuler.x).toFixed(1)),
+                        parseFloat(THREE.MathUtils.radToDeg(worldEuler.y).toFixed(1)),
+                        parseFloat(THREE.MathUtils.radToDeg(worldEuler.z).toFixed(1))
+                    ],
                     c: l.color,
                     sim: l.similarity,
-                    sm: l.smoothness
-                }))
+                    sm: l.smoothness,
+                    pm: l.portalMask ? 1 : 0,
+                    ap: l.animPreset || 'none',
+                    as: l.animSpeed ?? 1.0,
+                    aa: l.animAmp ?? 1.0
+                };
+            });
+
+            const cleanConfig = {
+                m: mind,
+                ta: currentTargetAspect,
+                l: exportedLayers
             };
+
             const base64Config = btoa(encodeURIComponent(JSON.stringify(cleanConfig)));
             const playerUrl = window.location.origin + window.location.pathname.replace('creator.html', '') + '?scene=' + base64Config;
 
@@ -1274,7 +1691,7 @@
             box.innerHTML = `<b>Ready-to-Scan V6 Link:</b><br><a href="${playerUrl}" target="_blank" style="color:#34d399;">${playerUrl}</a>`;
         };
 
-        // Record initial empty state so Undo can revert back to 0 layers
+        animate();
         saveHistoryState();
     </script>
 </body>
