@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nizhali V6 Studio — Pro AR Engine</title>
+    <title>Nizhali V6 Studio — Pro Keyframe & Mask Engine</title>
 
     <!-- Three.js + OrbitControls + TransformControls + GLTFLoader -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -16,98 +16,127 @@
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
-        body { width: 100vw; height: 100vh; overflow: hidden; background: #111217; color: #e4e4e7; display: grid; grid-template-columns: 320px 1fr 360px; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #0f1015; color: #e4e4e7; display: grid; grid-template-columns: 310px 1fr 360px; grid-template-rows: 1fr 135px; }
 
-        .panel { background: #181920; border-right: 1px solid #272935; display: flex; flex-direction: column; height: 100vh; overflow-y: auto; padding: 14px; z-index: 20; }
+        /* Left & Right Panels */
+        .panel { background: #181920; border-right: 1px solid #272935; display: flex; flex-direction: column; height: calc(100vh - 135px); overflow-y: auto; padding: 12px; z-index: 20; }
         .panel-right { border-right: none; border-left: 1px solid #272935; }
 
-        .brand-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid #272935; margin-bottom: 10px; }
-        .brand-title { font-size: 14px; font-weight: 700; color: #a78bfa; letter-spacing: 0.8px; text-transform: uppercase; }
-        .badge { background: #2e1065; color: #c4b5fd; font-size: 10px; padding: 3px 7px; border-radius: 6px; font-weight: 600; }
+        /* Bottom Master Timeline Dock */
+        #timeline-dock {
+            grid-column: 1 / 4;
+            background: #13141a;
+            border-top: 1px solid #272935;
+            display: flex;
+            flex-direction: column;
+            padding: 8px 16px;
+            z-index: 30;
+        }
 
-        h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #8b8d98; margin: 12px 0 6px 0; display: flex; justify-content: space-between; align-items: center; }
+        .brand-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid #272935; margin-bottom: 8px; }
+        .brand-title { font-size: 13px; font-weight: 700; color: #a78bfa; letter-spacing: 0.8px; text-transform: uppercase; }
+        .badge { background: #2e1065; color: #c4b5fd; font-size: 10px; padding: 2px 7px; border-radius: 6px; font-weight: 600; }
 
-        .step-card { background: #13141b; border: 1px solid #252734; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+        h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #8b8d98; margin: 10px 0 5px 0; display: flex; justify-content: space-between; align-items: center; }
+        .step-card { background: #13141b; border: 1px solid #252734; border-radius: 8px; padding: 9px; margin-bottom: 8px; }
 
-        .btn { background: #222430; color: #f4f4f5; border: 1px solid #323546; padding: 8px 11px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; width: 100%; margin-bottom: 6px; text-align: left; transition: 0.15s; display: flex; align-items: center; gap: 8px; }
+        .btn { background: #222430; color: #f4f4f5; border: 1px solid #323546; padding: 7px 10px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; width: 100%; margin-bottom: 5px; text-align: left; transition: 0.15s; display: flex; align-items: center; gap: 7px; }
         .btn:hover:not(:disabled) { background: #2d3040; border-color: #7c3aed; }
-        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-        .btn-compile { background: #065f46; border-color: #10b981; color: #ecfdf5; justify-content: center; margin-top: 8px; }
-        .btn-compile:hover:not(:disabled) { background: #047857; }
-        .btn-primary { background: #7c3aed; border-color: #8b5cf6; justify-content: center; font-size: 13px; padding: 11px; }
-        .btn-primary:hover { background: #6d28d9; }
-        .btn-danger { background: #3b1822; border-color: #7f1d1d; color: #fca5a5; justify-content: center; margin-top: 12px; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-compile { background: #065f46; border-color: #10b981; color: #ecfdf5; justify-content: center; margin-top: 6px; }
+        .btn-primary { background: #7c3aed; border-color: #8b5cf6; justify-content: center; font-size: 12px; padding: 10px; }
+        .btn-mask { background: #0e3a47; border-color: #06b6d4; color: #a5f3fc; justify-content: center; }
+        .btn-danger { background: #3b1822; border-color: #7f1d1d; color: #fca5a5; justify-content: center; margin-top: 10px; }
 
-        .progress-wrap { width: 100%; height: 6px; background: #0e0f14; border-radius: 4px; overflow: hidden; margin-top: 6px; display: none; }
+        .progress-wrap { width: 100%; height: 5px; background: #0e0f14; border-radius: 4px; overflow: hidden; margin-top: 5px; display: none; }
         .progress-bar { width: 0%; height: 100%; background: #10b981; transition: width 0.15s; }
 
-        /* Hierarchy & Folder Styling */
-        .layer-item { padding: 8px 10px; border-radius: 7px; background: #121318; border: 1px solid #252733; margin-bottom: 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 12px; transition: 0.1s; }
+        /* Hierarchy Rows */
+        .layer-item { padding: 7px 9px; border-radius: 6px; background: #121318; border: 1px solid #252733; margin-bottom: 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
         .layer-item:hover { border-color: #4b5563; }
         .layer-item.active { border-color: #8b5cf6; background: #231d38; font-weight: 600; color: #fff; }
         .layer-item.multi-selected { border-color: #38bdf8; background: #162436; }
-        .layer-item.child-layer { margin-left: 18px; border-left: 2px solid #6d28d9; }
-        .layer-focus-btn { background: #272935; border: 1px solid #3f3f56; color: #cbd5e1; border-radius: 5px; padding: 2px 6px; font-size: 11px; cursor: pointer; margin-left: 5px; }
+        .layer-item.child-layer { margin-left: 16px; border-left: 2px solid #6d28d9; }
+        .layer-focus-btn { background: #272935; border: 1px solid #3f3f56; color: #cbd5e1; border-radius: 4px; padding: 1px 5px; font-size: 10px; cursor: pointer; margin-left: 4px; }
         .layer-focus-btn:hover { background: #7c3aed; color: #fff; }
 
-        label { display: block; font-size: 11px; color: #a1a1aa; margin: 6px 0 3px; }
-        input[type="text"], input[type="number"], select { width: 100%; padding: 7px 9px; background: #0e0f14; border: 1px solid #2c2e3d; color: #fff; border-radius: 6px; font-size: 12px; user-select: text; }
-        input[type="text"]:focus, input[type="number"]:focus, select:focus { outline: none; border-color: #8b5cf6; }
+        label { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #a1a1aa; margin: 5px 0 2px; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 6px 8px; background: #0e0f14; border: 1px solid #2c2e3d; color: #fff; border-radius: 5px; font-size: 11px; user-select: text; }
         input[type="range"] { width: 100%; accent-color: #8b5cf6; cursor: pointer; }
-        .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 
-        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 12px; color: #e4e4e7; cursor: pointer; }
-        .toggle-row input[type="checkbox"] { accent-color: #8b5cf6; width: 16px; height: 16px; cursor: pointer; }
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-size: 11px; color: #e4e4e7; cursor: pointer; }
+        .toggle-row input[type="checkbox"] { accent-color: #8b5cf6; width: 15px; height: 15px; cursor: pointer; }
 
-        /* Viewport */
-        #viewport-container { position: relative; width: 100%; height: 100vh; background: #0b0c10; overflow: hidden; }
+        /* Keyframe Diamond Button */
+        .kf-btn { background: transparent; border: none; color: #52525b; cursor: pointer; font-size: 12px; padding: 0 4px; transition: 0.15s; }
+        .kf-btn:hover { color: #fbbf24; transform: scale(1.2); }
+        .kf-btn.has-kf { color: #f59e0b; text-shadow: 0 0 6px rgba(245, 158, 11, 0.6); }
+
+        /* Center Viewport */
+        #viewport-container { position: relative; width: 100%; height: calc(100vh - 135px); background: #0b0c10; overflow: hidden; }
         #viewport-container.space-pan { cursor: grab !important; }
         #viewport-container.space-pan:active { cursor: grabbing !important; }
         #webgl-canvas { width: 100%; height: 100%; display: block; }
 
         .top-toolbar {
-            position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-            display: flex; gap: 10px; background: rgba(24, 25, 32, 0.92); backdrop-filter: blur(10px);
-            border: 1px solid #2e303e; padding: 6px 12px; border-radius: 10px; z-index: 10;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.45); white-space: nowrap;
+            position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 8px; background: rgba(24, 25, 32, 0.92); backdrop-filter: blur(10px);
+            border: 1px solid #2e303e; padding: 5px 10px; border-radius: 9px; z-index: 10; white-space: nowrap;
         }
         .tool-group { display: flex; gap: 4px; align-items: center; }
-        .tool-divider { width: 1px; height: 20px; background: #2e303e; }
-        .tool-btn { background: transparent; color: #a1a1aa; border: 1px solid transparent; padding: 5px 9px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.15s; }
+        .tool-divider { width: 1px; height: 18px; background: #2e303e; }
+        .tool-btn { background: transparent; color: #a1a1aa; border: 1px solid transparent; padding: 4px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; }
         .tool-btn:hover:not(:disabled) { color: #fff; background: #272935; }
         .tool-btn:disabled { opacity: 0.35; cursor: not-allowed; }
         .tool-btn.active { background: #7c3aed; color: #fff; }
         .tool-btn.highlight { color: #34d399; border-color: rgba(16, 185, 129, 0.3); }
 
         .viewport-footer {
-            position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-            background: rgba(15, 16, 22, 0.88); border: 1px solid #272935; padding: 6px 14px;
-            border-radius: 20px; font-size: 11px; color: #9ca3af; pointer-events: none; z-index: 10; white-space: nowrap;
+            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+            background: rgba(15, 16, 22, 0.88); border: 1px solid #272935; padding: 4px 12px;
+            border-radius: 20px; font-size: 10px; color: #9ca3af; pointer-events: none; z-index: 10; white-space: nowrap;
         }
 
         .status-toast {
-            position: absolute; top: 64px; left: 50%; transform: translateX(-50%);
+            position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
             background: rgba(16, 185, 129, 0.18); border: 1px solid #10b981; color: #34d399;
-            padding: 7px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; display: none; z-index: 10;
+            padding: 6px 14px; border-radius: 8px; font-size: 11px; font-weight: 600; display: none; z-index: 10;
         }
 
-        #export-box { margin-top: 10px; padding: 10px; background: #0e0f14; border: 1px dashed #4b5563; border-radius: 8px; font-family: monospace; font-size: 11px; word-break: break-all; color: #34d399; display: none; max-height: 120px; overflow-y: auto; user-select: text; }
+        /* Master Timeline Scrubber & Keyframe Track */
+        .timeline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 12px; }
+        .timeline-controls { display: flex; align-items: center; gap: 8px; }
+        .tl-btn { background: #222430; color: #fff; border: 1px solid #36394c; padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; }
+        .tl-btn:hover { background: #7c3aed; }
+        .tl-btn.autokey-on { background: #991b1b; border-color: #ef4444; color: #fecaca; }
+
+        .scrubber-container { position: relative; width: 100%; padding: 6px 0; }
+        #masterTimelineScrubber { width: 100%; accent-color: #f59e0b; height: 6px; cursor: pointer; }
+        #keyframeTrack { position: relative; width: 100%; height: 22px; background: #0b0c10; border: 1px solid #232530; border-radius: 5px; margin-top: 4px; overflow: hidden; }
+        .kf-marker {
+            position: absolute; top: 3px; width: 12px; height: 12px; transform: translateX(-50%) rotate(45deg);
+            background: #f59e0b; border: 1px solid #fff; cursor: pointer; border-radius: 2px; z-index: 5;
+        }
+        .kf-marker:hover { background: #ef4444; transform: translateX(-50%) rotate(45deg) scale(1.25); }
+
+        #export-box { margin-top: 8px; padding: 8px; background: #0e0f14; border: 1px dashed #4b5563; border-radius: 6px; font-family: monospace; font-size: 10px; word-break: break-all; color: #34d399; display: none; max-height: 95px; overflow-y: auto; user-select: text; }
     </style>
 </head>
 <body>
 
-    <!-- 1. LEFT PANEL: TARGET, UNIFIED ADD LAYER & MULTI-SELECT HIERARCHY -->
+    <!-- 1. LEFT PANEL: TARGET, ADD MEDIA / MASK PLANE & HIERARCHY -->
     <div class="panel">
         <div class="brand-header">
             <span class="brand-title">Nizhali V6 Studio</span>
-            <span class="badge">Pro Engine</span>
+            <span class="badge">Keyframes + Clip Masks</span>
         </div>
 
         <h3>1. Target Image & Compiler</h3>
         <div class="step-card">
             <label>Upload Target Photo OR Paste Dropbox Image Link</label>
-            <input type="file" id="targetImgInput" accept="image/*" style="font-size:11px; width:100%; margin-bottom:5px;">
+            <input type="file" id="targetImgInput" accept="image/*" style="font-size:10px; width:100%; margin-bottom:4px;">
             <input type="text" id="targetImgUrlInput" placeholder="https://www.dropbox.com/.../target.jpg" oninput="loadTargetFromUrl()">
 
             <button class="btn btn-compile" id="compileMindBtn" onclick="compileMindInBrowser()">
@@ -116,24 +145,27 @@
             <div class="progress-wrap" id="compileProgressWrap">
                 <div class="progress-bar" id="compileProgressBar"></div>
             </div>
-            <div id="compileStatusText" style="font-size:11px; color:#34d399; margin-top:4px; display:none;"></div>
+            <div id="compileStatusText" style="font-size:10px; color:#34d399; margin-top:4px; display:none;"></div>
 
-            <label style="margin-top:8px; color:#c4b5fd;">Dropbox Compiled .mind Link (For Final Export)</label>
+            <label style="margin-top:6px; color:#c4b5fd;">Dropbox Compiled .mind Link</label>
             <input type="text" id="mindUrlInput" placeholder="Paste Dropbox link of compiled .mind file">
         </div>
 
-        <h3>2. Add Objects & Folders</h3>
-        <button class="btn btn-primary" onclick="addMediaLayer()" style="margin-bottom:6px;">
+        <h3>2. Add Objects, Masks & Folders</h3>
+        <button class="btn btn-primary" onclick="addMediaLayer()">
             ➕ Add Media Layer (.mp4 / .png / .glb)
         </button>
+        <button class="btn btn-mask" onclick="addClipMaskPlane()">
+            ✂️ + Add Clip Mask Plane (Invisible Portal Window)
+        </button>
         <div class="row-2">
-            <button class="btn" onclick="groupSelectedLayers()" title="Shortcut: Ctrl+G">📁 Group Selected</button>
+            <button class="btn" onclick="groupSelectedLayers()" title="Shortcut: Ctrl+G">📁 Group (Ctrl+G)</button>
             <button class="btn" onclick="ungroupSelectedFolder()">📂 Ungroup</button>
         </div>
 
         <h3>
             <span>3. Scene Hierarchy</span>
-            <small style="color:#666; font-weight:normal; text-transform:none;">Ctrl/Shift + Click to multi-select</small>
+            <small style="color:#666; font-weight:normal; text-transform:none;">Ctrl/Shift + Click</small>
         </h3>
         <div id="layerList">
             <div style="color:#666; font-size:11px; padding:6px 0;">No layers added yet.</div>
@@ -156,7 +188,6 @@
             <div class="tool-divider"></div>
             <div class="tool-group">
                 <button class="tool-btn highlight" onclick="focusSelectedLayer()" title="Focus Selected (F)">🎯 Focus (F)</button>
-                <button class="tool-btn" id="globalPlayPauseBtn" onclick="toggleAllPlayback()">⏸ Pause All</button>
             </div>
             <div class="tool-divider"></div>
             <div class="tool-group">
@@ -170,13 +201,13 @@
         <div id="toast" class="status-toast"></div>
 
         <div class="viewport-footer">
-            🖐️ <b>Spacebar + Drag:</b> Pan | <b>Ctrl/Shift + Click:</b> Multi-Select | <b>Ctrl+G:</b> Group Folder | <b>F:</b> Focus Object
+            🖐️ <b>Spacebar + Drag:</b> Pan | <b>Ctrl/Shift + Click:</b> Multi-Select | <b>◆ Diamond:</b> Add Keyframe at Playhead | <b>F:</b> Focus
         </div>
 
         <canvas id="webgl-canvas"></canvas>
     </div>
 
-    <!-- 3. RIGHT PANEL: INSPECTOR, PLAYHEAD SCRUBBER & EFFECTS -->
+    <!-- 3. RIGHT PANEL: INSPECTOR (WITH KEYFRAME DIAMONDS & CLIP MASK SELECTOR) -->
     <div class="panel panel-right">
         <div class="brand-header">
             <span class="brand-title">Inspector</span>
@@ -184,110 +215,120 @@
         </div>
 
         <div id="inspectorEmpty" style="color:#71717a; font-size:12px; line-height:1.6;">
-            Click <b>➕ Add Media Layer</b> on the left. Every layer spawns at <b>0, 0, 0</b> and automatically detects <b>.mp4</b>, <b>.png</b>, or <b>.glb</b>!
+            Select a layer or add a <b>Media Layer</b> / <b>Clip Mask Plane</b>. Click any <b>◆</b> icon next to a parameter to keyframe it on the Master Timeline!
         </div>
 
         <div id="inspectorControls" style="display:none;">
-            <label>Name</label>
+            <label>Layer Name</label>
             <input type="text" id="inpName" oninput="syncUIFromInspector()" onchange="saveHistoryState()">
 
-            <!-- Media Source Box (Hidden if Folder is selected) -->
-            <div id="mediaSourceCard" class="step-card" style="margin-top:8px;">
-                <label style="color:#34d399; margin-top:0;">Dropbox Link (.mp4 / .png / .glb) — Auto-Detects!</label>
-                <input type="text" id="inpUrl" placeholder="Paste Dropbox link..." oninput="handleDropboxUrl()">
-
-                <label style="margin-top:6px;">Or Choose Local File (.mp4 / .png / .glb)</label>
-                <input type="file" id="inpLocalFile" accept="video/*,image/*,.glb,.gltf" style="font-size:11px; width:100%;" onchange="handleLocalFile(event)">
+            <!-- Mask Plane Helper Toggle (Only shown when a Clip Mask Plane is selected) -->
+            <div id="maskPlaneCard" class="step-card" style="display:none; margin-top:8px; border-color:#06b6d4;">
+                <label class="toggle-row" style="margin:0;">
+                    <span style="color:#67e8f9; font-weight:600;">👁️ Show Cyan Helper Guide in Studio</span>
+                    <input type="checkbox" id="maskGuideToggle" checked onchange="syncMaskPlaneGuide()">
+                </label>
+                <small style="color:#9ca3af; font-size:10px; display:block; margin-top:4px;">
+                    This plane is <b>always 100% invisible</b> in the final AR output, and clips any layer assigned to it whether this guide is ON or OFF!
+                </small>
             </div>
 
-            <!-- TIMELINE PLAYHEAD SCRUBBER (For Video & Animated 3D .glb Models!) -->
-            <div id="timelineCard" class="step-card" style="display:none; border-color:#3b82f6;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                    <span style="font-size:11px; font-weight:600; color:#60a5fa;" id="timelineLabel">🎬 Timeline Scrubber</span>
-                    <span style="font-size:11px; font-family:monospace; color:#cbd5e1;" id="timecodeDisplay">0.00s / 0.00s</span>
-                </div>
-                <input type="range" id="timelineScrubber" min="0" max="100" step="0.01" value="0" oninput="scrubTimeline(this.value)">
-                <div class="row-2" style="margin-top:6px;">
-                    <button class="btn" id="layerPlayPauseBtn" style="justify-content:center; margin:0;" onclick="toggleSelectedMediaPlayback()">⏸ Pause</button>
-                    <button class="btn" style="justify-content:center; margin:0;" onclick="restartSelectedMedia()">⏮ Frame 0</button>
-                </div>
+            <!-- Media Source Card (Hidden for Folders & Mask Planes) -->
+            <div id="mediaSourceCard" class="step-card" style="margin-top:8px;">
+                <label style="color:#34d399; margin-top:0;">Dropbox Link (.mp4 / .png / .glb)</label>
+                <input type="text" id="inpUrl" placeholder="Paste Dropbox link..." oninput="handleDropboxUrl()">
+
+                <label style="margin-top:5px;">Or Local File (.mp4 / .png / .glb)</label>
+                <input type="file" id="inpLocalFile" accept="video/*,image/*,.glb,.gltf" style="font-size:10px; width:100%;" onchange="handleLocalFile(event)">
+
                 <div id="glbClipRow" style="display:none; margin-top:6px;">
-                    <label>3D Animation Clip Inside .glb</label>
+                    <label>Embedded 3D .glb Animation Clip</label>
                     <select id="glbClipSelect" onchange="changeGlbClip()"></select>
                 </div>
             </div>
 
-            <!-- 3D TRANSFORMS (Default 0, 0, 0) -->
-            <h3>Transform (Default: 0, 0, 0)</h3>
+            <!-- 3D TRANSFORMS + KEYFRAME BUTTONS -->
+            <h3>
+                <span>Transform (0, 0, 0)</span>
+                <button class="kf-btn" id="kf-btn-transform" onclick="addKeyframeForGroup('transform')" title="Keyframe Pos/Scale/Rot at current time">◆ Keyframe Transform</button>
+            </h3>
             <div class="row-3">
-                <div><label style="color:#f87171;">Pos X</label><input type="number" id="posX" step="0.02" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label style="color:#4ade80;">Pos Y</label><input type="number" id="posY" step="0.02" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label style="color:#60a5fa;">Pos Z</label><input type="number" id="posZ" step="0.02" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label><span style="color:#f87171;">Pos X</span><button class="kf-btn" id="kf-posX" onclick="toggleParamKeyframe('posX')">◆</button></label><input type="number" id="posX" step="0.02" value="0" oninput="onParamEdit('posX')"></div>
+                <div><label><span style="color:#4ade80;">Pos Y</span><button class="kf-btn" id="kf-posY" onclick="toggleParamKeyframe('posY')">◆</button></label><input type="number" id="posY" step="0.02" value="0" oninput="onParamEdit('posY')"></div>
+                <div><label><span style="color:#60a5fa;">Pos Z</span><button class="kf-btn" id="kf-posZ" onclick="toggleParamKeyframe('posZ')">◆</button></label><input type="number" id="posZ" step="0.02" value="0" oninput="onParamEdit('posZ')"></div>
             </div>
             <div class="row-3" style="margin-top:4px;">
-                <div><label>Scale X</label><input type="number" id="scaleX" step="0.05" value="1" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label>Scale Y</label><input type="number" id="scaleY" step="0.05" value="1" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label>Scale Z</label><input type="number" id="scaleZ" step="0.05" value="1" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label><span>Scale X</span><button class="kf-btn" id="kf-scaleX" onclick="toggleParamKeyframe('scaleX')">◆</button></label><input type="number" id="scaleX" step="0.05" value="1" oninput="onParamEdit('scaleX')"></div>
+                <div><label><span>Scale Y</span><button class="kf-btn" id="kf-scaleY" onclick="toggleParamKeyframe('scaleY')">◆</button></label><input type="number" id="scaleY" step="0.05" value="1" oninput="onParamEdit('scaleY')"></div>
+                <div><label><span>Scale Z</span><button class="kf-btn" id="kf-scaleZ" onclick="toggleParamKeyframe('scaleZ')">◆</button></label><input type="number" id="scaleZ" step="0.05" value="1" oninput="onParamEdit('scaleZ')"></div>
             </div>
             <div class="row-3" style="margin-top:4px;">
-                <div><label>Rot X</label><input type="number" id="rotX" step="5" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label>Rot Y</label><input type="number" id="rotY" step="5" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
-                <div><label>Rot Z</label><input type="number" id="rotZ" step="5" value="0" oninput="syncTransformFromInputs()" onchange="saveHistoryState()"></div>
+                <div><label><span>Rot X</span><button class="kf-btn" id="kf-rotX" onclick="toggleParamKeyframe('rotX')">◆</button></label><input type="number" id="rotX" step="5" value="0" oninput="onParamEdit('rotX')"></div>
+                <div><label><span>Rot Y</span><button class="kf-btn" id="kf-rotY" onclick="toggleParamKeyframe('rotY')">◆</button></label><input type="number" id="rotY" step="5" value="0" oninput="onParamEdit('rotY')"></div>
+                <div><label><span>Rot Z</span><button class="kf-btn" id="kf-rotZ" onclick="toggleParamKeyframe('rotZ')">◆</button></label><input type="number" id="rotZ" step="5" value="0" oninput="onParamEdit('rotZ')"></div>
             </div>
 
-            <!-- EFFECTS & PRESET ANIMATIONS -->
-            <h3>Built-In Effects & Preset Animations</h3>
-            <div class="step-card">
-                <!-- 1. Preset Animation Selector -->
-                <label style="color:#c4b5fd; margin-top:0;">✨ Preset Animation (No External Keyframes Needed)</label>
-                <select id="animPreset" onchange="syncEffectsFromInputs(); saveHistoryState();">
-                    <option value="none">None (Static)</option>
-                    <option value="float">🎈 Floating (Smooth Up/Down Bob)</option>
-                    <option value="spinY">🔄 Spin 360° (Turntable Y-Axis)</option>
-                    <option value="spinZ">🎡 Spin 360° (Wheel Z-Axis)</option>
-                    <option value="pulse">💓 Pulse / Heartbeat Scale</option>
-                    <option value="wiggle">〰️ Wiggle / Shake Tilt</option>
-                    <option value="fadeIn">🌅 Fade In on Target Found</option>
-                    <option value="fadeOut">🌇 Fade Out Loop</option>
+            <!-- OPACITY & CLIPPING MASK SECTION -->
+            <div id="appearanceCard" class="step-card" style="margin-top:8px;">
+                <label>
+                    <span>💧 Layer Opacity (<span id="opacityVal">1.00</span>)</span>
+                    <button class="kf-btn" id="kf-opacity" onclick="toggleParamKeyframe('opacity')" title="Keyframe Opacity">◆</button>
+                </label>
+                <input type="range" id="inpOpacity" min="0" max="1" step="0.02" value="1" oninput="onParamEdit('opacity')">
+
+                <!-- UNIVERSAL PORTAL / CLIP MASK SELECTOR (Works at ANY Z, Negative or Positive!) -->
+                <div style="border-top:1px solid #252734; margin-top:8px; padding-top:6px;">
+                    <label style="color:#67e8f9;">✂️ Clipping / Portal Mask Source (Works at +Z & -Z!)</label>
+                    <select id="clipSourceSelect" onchange="syncEffectsFromInputs(); saveHistoryState();">
+                        <option value="none">None (Bleed Freely Outside Frame)</option>
+                        <option value="target">🕳️ Target Image Bounds (Portal Window)</option>
+                    </select>
+                    <small style="color:#71717a; font-size:10px; display:block; margin-top:3px;">
+                        Clips this layer strictly inside the Target Frame or any custom <b>Clip Mask Plane</b>—regardless of whether Pos Z is negative or positive!
+                    </small>
+                </div>
+            </div>
+
+            <!-- PRESET ANIMATIONS & CHROMA KEY -->
+            <div id="effectsCard" class="step-card">
+                <label style="color:#c4b5fd; margin-top:0;">✨ Loop Preset Animation</label>
+                <select id="animPreset" onchange="syncEffectsFromInputs(); updateMasterDuration(); saveHistoryState();">
+                    <option value="none">None</option>
+                    <option value="float">🎈 Floating (Smooth Bobbing)</option>
+                    <option value="spinY">🔄 Spin 360° (Y-Axis)</option>
+                    <option value="spinZ">🎡 Spin 360° (Z-Axis)</option>
+                    <option value="pulse">💓 Pulse Scale</option>
+                    <option value="wiggle">〰️ Wiggle Tilt</option>
+                    <option value="fadeIn">🌅 Fade In</option>
+                    <option value="fadeOut">🌇 Fade Out</option>
                 </select>
 
                 <div id="animParamsBox" style="display:none; margin-top:6px;">
                     <div class="row-2">
                         <div>
-                            <label>Speed (<span id="animSpeedVal">1.0</span>x)</label>
-                            <input type="range" id="animSpeed" min="0.2" max="4.0" step="0.1" value="1.0" oninput="syncEffectsFromInputs()" onchange="saveHistoryState()">
+                            <label><span>Speed (<span id="animSpeedVal">1.0</span>x)</span><button class="kf-btn" id="kf-animSpeed" onclick="toggleParamKeyframe('animSpeed')">◆</button></label>
+                            <input type="range" id="animSpeed" min="0.1" max="4.0" step="0.1" value="1.0" oninput="onParamEdit('animSpeed')">
                         </div>
                         <div>
-                            <label>Intensity (<span id="animAmpVal">1.0</span>x)</label>
-                            <input type="range" id="animAmp" min="0.2" max="3.0" step="0.1" value="1.0" oninput="syncEffectsFromInputs()" onchange="saveHistoryState()">
+                            <label><span>Intensity (<span id="animAmpVal">1.0</span>x)</span><button class="kf-btn" id="kf-animAmp" onclick="toggleParamKeyframe('animAmp')">◆</button></label>
+                            <input type="range" id="animAmp" min="0.1" max="3.0" step="0.1" value="1.0" oninput="onParamEdit('animAmp')">
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. Portal Window Mask Effect (For Z < 0) -->
-                <div style="border-top:1px solid #252734; margin-top:8px; padding-top:6px;">
-                    <label class="toggle-row">
-                        <span>🕳️ <b>Portal Window Mask</b> (Clip outside Target Frame)</span>
-                        <input type="checkbox" id="portalToggle" onchange="syncEffectsFromInputs(); saveHistoryState();">
-                    </label>
-                    <small style="color:#71717a; font-size:10px; display:block;">
-                        Put layer at negative Z (e.g. <b>Pos Z = -0.25</b>) and scale it up. It will live <i>inside</i> the target frame like a deep 3D window without bleeding outside!
-                    </small>
-                </div>
-
-                <!-- 3. Chroma Key Effect (Toggleable!) -->
+                <!-- Chroma Key Effect -->
                 <div id="chromaEffectSection" style="border-top:1px solid #252734; margin-top:8px; padding-top:6px;">
                     <label class="toggle-row">
                         <span>🟩 <b>Chroma Key Green/Blue Screen</b></span>
                         <input type="checkbox" id="chromaToggle" onchange="syncEffectsFromInputs(); saveHistoryState();">
                     </label>
-                    <div id="chromaParamsBox" style="display:none; margin-top:6px;">
+                    <div id="chromaParamsBox" style="display:none; margin-top:5px;">
                         <label>Key Color</label>
-                        <input type="color" id="chromaColor" value="#00ff00" style="width:100%; height:28px; border:none; background:none; cursor:pointer;" oninput="syncEffectsFromInputs()" onchange="saveHistoryState()">
-                        <label>Similarity (<span id="simVal">0.38</span>)</label>
-                        <input type="range" id="chromaSim" min="0.05" max="0.8" step="0.01" value="0.38" oninput="syncEffectsFromInputs()" onchange="saveHistoryState()">
-                        <label>Smoothness (<span id="smoothVal">0.08</span>)</label>
-                        <input type="range" id="chromaSmooth" min="0.01" max="0.3" step="0.01" value="0.08" oninput="syncEffectsFromInputs()" onchange="saveHistoryState()">
+                        <input type="color" id="chromaColor" value="#00ff00" style="width:100%; height:24px; border:none; background:none; cursor:pointer;" oninput="syncEffectsFromInputs()">
+                        <label><span>Similarity (<span id="simVal">0.38</span>)</span><button class="kf-btn" id="kf-similarity" onclick="toggleParamKeyframe('similarity')">◆</button></label>
+                        <input type="range" id="chromaSim" min="0.05" max="0.8" step="0.01" value="0.38" oninput="onParamEdit('similarity')">
+                        <label><span>Smoothness (<span id="smoothVal">0.08</span>)</span><button class="kf-btn" id="kf-smoothness" onclick="toggleParamKeyframe('smoothness')">◆</button></label>
+                        <input type="range" id="chromaSmooth" min="0.01" max="0.3" step="0.01" value="0.08" oninput="onParamEdit('smoothness')">
                     </div>
                 </div>
             </div>
@@ -295,15 +336,38 @@
             <button class="btn btn-danger" onclick="deleteSelectedLayers()">🗑️ Delete Selected</button>
         </div>
 
-        <div style="margin-top:auto; padding-top:12px; border-top:1px solid #272935;">
+        <div style="margin-top:auto; padding-top:10px; border-top:1px solid #272935;">
             <button class="btn btn-primary" onclick="exportProject()">⚡ Generate V6 AR Link</button>
             <div id="export-box"></div>
         </div>
     </div>
 
+    <!-- 4. BOTTOM DOCK: MASTER SCENE TIMELINE & KEYFRAME TRACK -->
+    <div id="timeline-dock">
+        <div class="timeline-header">
+            <div class="timeline-controls">
+                <button class="tl-btn" id="masterPlayBtn" onclick="toggleMasterPlay()">⏸ Pause</button>
+                <button class="tl-btn" onclick="scrubMasterTimeline(0)">⏮ 0.0s</button>
+                <button class="tl-btn" id="autoKeyBtn" onclick="toggleAutoKey()" title="Automatically create keyframes when changing values">🔴 Auto-Key: OFF</button>
+                <span style="font-size:12px; font-family:monospace; color:#fbbf24; margin-left:6px;" id="masterTimeDisplay">0.00s / 0.00s (Static)</span>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:11px; color:#9ca3af;" id="durationModeBadge">Mode: Static (0s)</span>
+                <label style="margin:0; font-size:11px; color:#cbd5e1;">Custom Loop Duration (s):</label>
+                <input type="number" id="customDurationInput" value="5" min="1" max="120" step="0.5" style="width:65px; padding:4px 6px;" onchange="updateMasterDuration()">
+            </div>
+        </div>
+
+        <div class="scrubber-container">
+            <input type="range" id="masterTimelineScrubber" min="0" max="5" step="0.01" value="0" oninput="scrubMasterTimeline(this.value)">
+            <div id="keyframeTrack" title="Click a yellow diamond to jump to keyframe, Right-Click diamond to delete it"></div>
+        </div>
+    </div>
+
     <script>
         // ============================================================================
-        // 1. THREE.JS SCENE, PORTAL OCCLUDER MASK & GIZMO SETUP
+        // 1. THREE.JS SCENE & LOCAL CLIPPING PLANES INITIALIZATION
         // ============================================================================
         const container = document.getElementById('viewport-container');
         const canvas = document.getElementById('webgl-canvas');
@@ -318,6 +382,7 @@
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.localClippingEnabled = true; // Enables true 3D bounding-box clipping at BOTH +Z and -Z!
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
         scene.add(ambientLight);
@@ -348,44 +413,6 @@
         const targetMesh = new THREE.Mesh(targetGeo, targetMat);
         scene.add(targetMesh);
 
-        // PORTAL OCCLUDER RING (Masks negative-Z portal layers outside the 1.0 x Aspect target window!)
-        const portalMaskGroup = new THREE.Group();
-        portalMaskGroup.renderOrder = 0;
-        scene.add(portalMaskGroup);
-
-        function rebuildPortalMask(aspect) {
-            while (portalMaskGroup.children.length) portalMaskGroup.remove(portalMaskGroup.children[0]);
-            // In Studio we make the mask semi-transparent dark around the frame so user sees the portal clipping live!
-            const maskMat = new THREE.MeshBasicMaterial({
-                color: 0x0b0c10,
-                colorWrite: true,
-                depthWrite: true,
-                side: THREE.DoubleSide
-            });
-            const M = 12; // Outer mask size
-            const hW = 0.5;
-            const hH = aspect / 2;
-
-            // Top, Bottom, Left, Right遮罩 planes around the target hole at Z = -0.001
-            const topP = new THREE.Mesh(new THREE.PlaneGeometry(M, (M - aspect) / 2), maskMat);
-            topP.position.set(0, hH + (M - aspect) / 4, -0.001);
-
-            const botP = new THREE.Mesh(new THREE.PlaneGeometry(M, (M - aspect) / 2), maskMat);
-            botP.position.set(0, -hH - (M - aspect) / 4, -0.001);
-
-            const leftP = new THREE.Mesh(new THREE.PlaneGeometry((M - 1) / 2, aspect), maskMat);
-            leftP.position.set(-hW - (M - 1) / 4, 0, -0.001);
-
-            const rightP = new THREE.Mesh(new THREE.PlaneGeometry((M - 1) / 2, aspect), maskMat);
-            rightP.position.set(hW + (M - 1) / 4, 0, -0.001);
-
-            [topP, botP, leftP, rightP].forEach(p => {
-                p.renderOrder = 0;
-                portalMaskGroup.add(p);
-            });
-        }
-        rebuildPortalMask(1.0);
-
         const orbit = new THREE.OrbitControls(camera, renderer.domElement);
         orbit.enableDamping = true;
         orbit.dampingFactor = 0.08;
@@ -397,7 +424,12 @@
 
         transformControl.addEventListener('dragging-changed', (event) => {
             orbit.enabled = !event.value;
-            if (!event.value) saveHistoryState();
+            if (!event.value) {
+                if (autoKeyEnabled) {
+                    addKeyframeForGroup('transform');
+                }
+                saveHistoryState();
+            }
         });
 
         transformControl.addEventListener('change', () => {
@@ -424,62 +456,393 @@
         });
 
         // ============================================================================
-        // 2. RENDER LOOP, TIMELINE PLAYHEAD & PRESET ANIMATIONS ENGINE
+        // 2. UNIVERSAL 4-PLANE 3D CLIPPING ENGINE (Clips ANY Layer to Target or Mask Plane!)
+        // ============================================================================
+        function computeClippingPlanesForSource(clipSourceId) {
+            if (!clipSourceId || clipSourceId === 'none') return null;
+
+            let refMatrix = targetMesh.matrixWorld;
+            let halfW = 0.5;
+            let halfH = currentTargetAspect / 2;
+
+            if (clipSourceId !== 'target') {
+                const maskLayer = layers.find(l => l.id === clipSourceId && l.isMaskPlane);
+                if (!maskLayer || !maskLayer.mesh) return null;
+                maskLayer.mesh.updateMatrixWorld(true);
+                refMatrix = maskLayer.mesh.matrixWorld;
+                halfW = 0.5;
+                halfH = 0.5;
+            } else {
+                targetMesh.updateMatrixWorld(true);
+            }
+
+            // Build 4 inward-facing 3D planes in local space of the mask/target, then transform to world space!
+            const pLeft   = new THREE.Plane(new THREE.Vector3( 1,  0, 0), halfW).applyMatrix4(refMatrix);
+            const pRight  = new THREE.Plane(new THREE.Vector3(-1,  0, 0), halfW).applyMatrix4(refMatrix);
+            const pBottom = new THREE.Plane(new THREE.Vector3( 0,  1, 0), halfH).applyMatrix4(refMatrix);
+            const pTop    = new THREE.Plane(new THREE.Vector3( 0, -1, 0), halfH).applyMatrix4(refMatrix);
+
+            return [pLeft, pRight, pBottom, pTop];
+        }
+
+        function updateLayerClippingAndOpacity(layer, effectiveOpacity) {
+            if (!layer.mesh || layer.isFolder || layer.isMaskPlane) return;
+            const planes = computeClippingPlanesForSource(layer.clipSource);
+
+            layer.mesh.traverse(child => {
+                if (child.isMesh && child.material) {
+                    child.material.clippingPlanes = planes;
+                    child.material.clipIntersection = false;
+                    child.material.transparent = true;
+
+                    if (child.material.uniforms && child.material.uniforms.opacity) {
+                        child.material.uniforms.opacity.value = effectiveOpacity;
+                        // Pass clipping planes into custom Chroma Key shader as well
+                        if (planes) {
+                            child.material.uniforms.useClip.value = 1.0;
+                            child.material.uniforms.clipP0.value.set(planes[0].normal.x, planes[0].normal.y, planes[0].normal.z, planes[0].constant);
+                            child.material.uniforms.clipP1.value.set(planes[1].normal.x, planes[1].normal.y, planes[1].normal.z, planes[1].constant);
+                            child.material.uniforms.clipP2.value.set(planes[2].normal.x, planes[2].normal.y, planes[2].normal.z, planes[2].constant);
+                            child.material.uniforms.clipP3.value.set(planes[3].normal.x, planes[3].normal.y, planes[3].normal.z, planes[3].constant);
+                        } else {
+                            child.material.uniforms.useClip.value = 0.0;
+                        }
+                    } else {
+                        child.material.opacity = effectiveOpacity;
+                    }
+                }
+            });
+        }
+
+        // ============================================================================
+        // 3. MASTER TIMELINE & KEYFRAME INTERPOLATION ENGINE
+        // ============================================================================
+        let masterTime = 0;
+        let masterDuration = 0; // 0 = Static scene
+        let masterPlaying = true;
+        let autoKeyEnabled = false;
+
+        const ANIMATABLE_PARAMS = ['posX', 'posY', 'posZ', 'scaleX', 'scaleY', 'scaleZ', 'rotX', 'rotY', 'rotZ', 'opacity', 'animSpeed', 'animAmp', 'similarity', 'smoothness'];
+
+        window.updateMasterDuration = function() {
+            // 1. Check max video/glb clip duration across all layers
+            let maxMediaDur = 0;
+            let hasAnyAnimationOrKeyframes = false;
+
+            layers.forEach(l => {
+                if (l.duration && l.duration > maxMediaDur) {
+                    maxMediaDur = l.duration;
+                }
+                if (l.animPreset && l.animPreset !== 'none') {
+                    hasAnyAnimationOrKeyframes = true;
+                }
+                if (l.keyframes) {
+                    for (const k in l.keyframes) {
+                        if (l.keyframes[k] && l.keyframes[k].length > 0) {
+                            hasAnyAnimationOrKeyframes = true;
+                        }
+                    }
+                }
+            });
+
+            const customDur = parseFloat(document.getElementById('customDurationInput').value) || 5.0;
+            const modeBadge = document.getElementById('durationModeBadge');
+            const scrubber = document.getElementById('masterTimelineScrubber');
+
+            if (maxMediaDur > 0) {
+                masterDuration = parseFloat(maxMediaDur.toFixed(2));
+                modeBadge.textContent = `Mode: Synced to Video (${masterDuration}s)`;
+                modeBadge.style.color = '#34d399';
+            } else if (hasAnyAnimationOrKeyframes) {
+                masterDuration = customDur;
+                modeBadge.textContent = `Mode: Custom Loop (${masterDuration}s)`;
+                modeBadge.style.color = '#c4b5fd';
+            } else {
+                // Static image/model only with no keyframes or presets -> Duration is 0 (Static)!
+                masterDuration = 0;
+                modeBadge.textContent = `Mode: Static Scene (0s)`;
+                modeBadge.style.color = '#9ca3af';
+            }
+
+            scrubber.max = Math.max(masterDuration, customDur);
+            renderKeyframeMarkers();
+        };
+
+        function getParamBaseValue(layer, param) {
+            if (param === 'posX') return layer.pos[0];
+            if (param === 'posY') return layer.pos[1];
+            if (param === 'posZ') return layer.pos[2];
+            if (param === 'scaleX') return layer.scale[0];
+            if (param === 'scaleY') return layer.scale[1];
+            if (param === 'scaleZ') return layer.scale[2];
+            if (param === 'rotX') return layer.rot[0];
+            if (param === 'rotY') return layer.rot[1];
+            if (param === 'rotZ') return layer.rot[2];
+            if (param === 'opacity') return layer.opacity ?? 1.0;
+            if (param === 'animSpeed') return layer.animSpeed ?? 1.0;
+            if (param === 'animAmp') return layer.animAmp ?? 1.0;
+            if (param === 'similarity') return layer.similarity ?? 0.38;
+            if (param === 'smoothness') return layer.smoothness ?? 0.08;
+            return 0;
+        }
+
+        function setParamBaseValue(layer, param, val) {
+            if (param === 'posX') layer.pos[0] = val;
+            else if (param === 'posY') layer.pos[1] = val;
+            else if (param === 'posZ') layer.pos[2] = val;
+            else if (param === 'scaleX') layer.scale[0] = val;
+            else if (param === 'scaleY') layer.scale[1] = val;
+            else if (param === 'scaleZ') layer.scale[2] = val;
+            else if (param === 'rotX') layer.rot[0] = val;
+            else if (param === 'rotY') layer.rot[1] = val;
+            else if (param === 'rotZ') layer.rot[2] = val;
+            else if (param === 'opacity') layer.opacity = val;
+            else if (param === 'animSpeed') layer.animSpeed = val;
+            else if (param === 'animAmp') layer.animAmp = val;
+            else if (param === 'similarity') layer.similarity = val;
+            else if (param === 'smoothness') layer.smoothness = val;
+        }
+
+        function evaluateKeyframedParam(layer, param, t) {
+            const baseVal = getParamBaseValue(layer, param);
+            if (!layer.keyframes || !layer.keyframes[param] || layer.keyframes[param].length === 0) {
+                return baseVal;
+            }
+            const kfs = layer.keyframes[param];
+            if (kfs.length === 1 || t <= kfs[0].t) return kfs[0].v;
+            if (t >= kfs[kfs.length - 1].t) return kfs[kfs.length - 1].v;
+
+            for (let i = 0; i < kfs.length - 1; i++) {
+                if (t >= kfs[i].t && t <= kfs[i + 1].t) {
+                    const span = kfs[i + 1].t - kfs[i].t;
+                    const ratio = span > 0.0001 ? (t - kfs[i].t) / span : 0;
+                    // Smooth Hermite interpolation
+                    const smoothRatio = ratio * ratio * (3 - 2 * ratio);
+                    return kfs[i].v + (kfs[i + 1].v - kfs[i].v) * smoothRatio;
+                }
+            }
+            return baseVal;
+        }
+
+        window.toggleParamKeyframe = function(param) {
+            const layer = getPrimarySelectedItem();
+            if (!layer) return;
+            if (!layer.keyframes) layer.keyframes = {};
+            if (!layer.keyframes[param]) layer.keyframes[param] = [];
+
+            const t = parseFloat(masterTime.toFixed(2));
+            const val = getParamBaseValue(layer, param);
+
+            // Check if keyframe already exists near current time
+            const existingIdx = layer.keyframes[param].findIndex(k => Math.abs(k.t - t) < 0.05);
+            if (existingIdx !== -1) {
+                layer.keyframes[param][existingIdx].v = val;
+                showToast(`◆ Updated ${param} keyframe at ${t}s`);
+            } else {
+                layer.keyframes[param].push({ t, v: val });
+                layer.keyframes[param].sort((a, b) => a.t - b.t);
+                showToast(`◆ Added ${param} keyframe at ${t}s`);
+            }
+
+            updateMasterDuration();
+            refreshKeyframeDiamonds();
+            saveHistoryState();
+        };
+
+        window.addKeyframeForGroup = function(group) {
+            const layer = getPrimarySelectedItem();
+            if (!layer) return;
+            if (group === 'transform') {
+                ['posX', 'posY', 'posZ', 'scaleX', 'scaleY', 'scaleZ', 'rotX', 'rotY', 'rotZ'].forEach(p => {
+                    if (!layer.keyframes) layer.keyframes = {};
+                    if (!layer.keyframes[p]) layer.keyframes[p] = [];
+                    const t = parseFloat(masterTime.toFixed(2));
+                    const val = getParamBaseValue(layer, p);
+                    const idx = layer.keyframes[p].findIndex(k => Math.abs(k.t - t) < 0.05);
+                    if (idx !== -1) layer.keyframes[p][idx].v = val;
+                    else {
+                        layer.keyframes[p].push({ t, v: val });
+                        layer.keyframes[p].sort((a, b) => a.t - b.t);
+                    }
+                });
+                updateMasterDuration();
+                refreshKeyframeDiamonds();
+                showToast(`◆ Keyframed Transform at ${masterTime.toFixed(2)}s`);
+            }
+        };
+
+        window.toggleAutoKey = function() {
+            autoKeyEnabled = !autoKeyEnabled;
+            const btn = document.getElementById('autoKeyBtn');
+            btn.textContent = autoKeyEnabled ? '🔴 Auto-Key: ON' : '🔴 Auto-Key: OFF';
+            btn.classList.toggle('autokey-on', autoKeyEnabled);
+        };
+
+        window.onParamEdit = function(param) {
+            const layer = getPrimarySelectedItem();
+            if (!layer) return;
+
+            const inputMap = {
+                posX: 'posX', posY: 'posY', posZ: 'posZ',
+                scaleX: 'scaleX', scaleY: 'scaleY', scaleZ: 'scaleZ',
+                rotX: 'rotX', rotY: 'rotY', rotZ: 'rotZ',
+                opacity: 'inpOpacity', animSpeed: 'animSpeed', animAmp: 'animAmp',
+                similarity: 'chromaSim', smoothness: 'chromaSmooth'
+            };
+            const el = document.getElementById(inputMap[param]);
+            if (!el) return;
+            const val = parseFloat(el.value) || 0;
+            setParamBaseValue(layer, param, val);
+
+            // Update UI labels
+            if (param === 'opacity') document.getElementById('opacityVal').textContent = val.toFixed(2);
+            if (param === 'animSpeed') document.getElementById('animSpeedVal').textContent = val;
+            if (param === 'animAmp') document.getElementById('animAmpVal').textContent = val;
+            if (param === 'similarity') document.getElementById('simVal').textContent = val;
+            if (param === 'smoothness') document.getElementById('smoothVal').textContent = val;
+
+            // If parameter already has keyframes OR Auto-Key is ON, record keyframe at current playhead!
+            if (autoKeyEnabled || (layer.keyframes && layer.keyframes[param] && layer.keyframes[param].length > 0)) {
+                toggleParamKeyframe(param);
+            }
+
+            applyTransformAndEffectsImmediate(layer);
+            renderLayerList();
+        };
+
+        function renderKeyframeMarkers() {
+            const track = document.getElementById('keyframeTrack');
+            track.innerHTML = '';
+            const layer = getPrimarySelectedItem();
+            if (!layer || !layer.keyframes) return;
+
+            const maxT = Math.max(masterDuration, parseFloat(document.getElementById('customDurationInput').value) || 5.0);
+            const allTimes = new Map();
+
+            for (const param in layer.keyframes) {
+                (layer.keyframes[param] || []).forEach(kf => {
+                    const key = kf.t.toFixed(2);
+                    if (!allTimes.has(key)) allTimes.set(key, []);
+                    allTimes.get(key).push(param);
+                });
+            }
+
+            allTimes.forEach((paramsList, timeStr) => {
+                const t = parseFloat(timeStr);
+                const pct = Math.min(99, Math.max(1, (t / maxT) * 100));
+                const marker = document.createElement('div');
+                marker.className = 'kf-marker';
+                marker.style.left = pct + '%';
+                marker.title = `${timeStr}s (${paramsList.join(', ')}) — Click to jump, Right-Click to delete`;
+
+                marker.onclick = (e) => {
+                    e.stopPropagation();
+                    scrubMasterTimeline(t);
+                };
+                marker.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    for (const p of paramsList) {
+                        layer.keyframes[p] = layer.keyframes[p].filter(k => Math.abs(k.t - t) > 0.05);
+                    }
+                    updateMasterDuration();
+                    refreshKeyframeDiamonds();
+                    saveHistoryState();
+                    showToast(`🗑️ Deleted keyframe at ${timeStr}s`);
+                };
+                track.appendChild(marker);
+            });
+        }
+
+        function refreshKeyframeDiamonds() {
+            const layer = getPrimarySelectedItem();
+            ANIMATABLE_PARAMS.forEach(p => {
+                const btn = document.getElementById('kf-' + p);
+                if (!btn) return;
+                const has = layer && layer.keyframes && layer.keyframes[p] && layer.keyframes[p].length > 0;
+                btn.classList.toggle('has-kf', !!has);
+            });
+            renderKeyframeMarkers();
+        }
+
+        window.toggleMasterPlay = function() {
+            masterPlaying = !masterPlaying;
+            document.getElementById('masterPlayBtn').textContent = masterPlaying ? '⏸ Pause' : '▶️ Play';
+            layers.forEach(l => {
+                if (l.videoEl) {
+                    if (masterPlaying) l.videoEl.play().catch(() => {});
+                    else l.videoEl.pause();
+                }
+            });
+        };
+
+        window.scrubMasterTimeline = function(val) {
+            masterTime = parseFloat(val) || 0;
+            masterPlaying = false;
+            document.getElementById('masterPlayBtn').textContent = '▶️ Play';
+
+            layers.forEach(l => {
+                if (l.videoEl && l.duration > 0) {
+                    l.videoEl.pause();
+                    l.videoEl.currentTime = masterTime % l.duration;
+                }
+                if (l.mixer && l.activeAction && l.duration > 0) {
+                    l.mixer.setTime(masterTime % l.duration);
+                }
+            });
+
+            evaluateSceneAtTime(masterTime, true);
+        };
+
+        // ============================================================================
+        // 4. MAIN RENDER & EVALUATION LOOP
         // ============================================================================
         const clock = new THREE.Clock();
         let camAnim = null;
-        let globalPlaying = true;
 
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-            const elapsed = clock.getElapsedTime();
-
-            // Check if any layer uses Portal Window Mask
-            const anyPortal = layers.some(l => l.portalMask);
-            portalMaskGroup.visible = anyPortal;
-            // Make target floor slightly see-through when a portal is active so you can see inside the frame!
-            targetMat.opacity = anyPortal ? 0.35 : 0.95;
-
-            // Update Preset Animations & 3D .glb Mixers
+        function evaluateSceneAtTime(t, updateUIInputs = false) {
             layers.forEach(l => {
-                if (l.isFolder || !l.mesh) return;
+                if (!l.mesh) return;
+                const isBeingDragged = (transformControl.dragging && selectedIds.includes(l.id));
 
-                // Update .glb AnimationMixer if playing
-                if (l.mixer && l.isPlaying) {
-                    l.mixer.update(delta);
+                // 1. Evaluate Keyframed or Base Values
+                let px = evaluateKeyframedParam(l, 'posX', t);
+                let py = evaluateKeyframedParam(l, 'posY', t);
+                let pz = evaluateKeyframedParam(l, 'posZ', t);
+                let sx = evaluateKeyframedParam(l, 'scaleX', t);
+                let sy = evaluateKeyframedParam(l, 'scaleY', t);
+                let sz = evaluateKeyframedParam(l, 'scaleZ', t);
+                let rx = evaluateKeyframedParam(l, 'rotX', t);
+                let ry = evaluateKeyframedParam(l, 'rotY', t);
+                let rz = evaluateKeyframedParam(l, 'rotZ', t);
+                let op = evaluateKeyframedParam(l, 'opacity', t);
+                let spd = evaluateKeyframedParam(l, 'animSpeed', t);
+                let amp = evaluateKeyframedParam(l, 'animAmp', t);
+                let sim = evaluateKeyframedParam(l, 'similarity', t);
+                let sm  = evaluateKeyframedParam(l, 'smoothness', t);
+
+                // 2. Layer Preset Animation Offsets on top of Keyframed Values!
+                if (!l.isFolder && !l.isMaskPlane && l.animPreset && l.animPreset !== 'none') {
+                    const phase = t * spd * 2.2;
+                    if (l.animPreset === 'float') pz += Math.sin(phase) * 0.06 * amp;
+                    else if (l.animPreset === 'spinY') ry = (ry + t * 60 * spd) % 360;
+                    else if (l.animPreset === 'spinZ') rz = (rz + t * 60 * spd) % 360;
+                    else if (l.animPreset === 'pulse') {
+                        const f = 1 + Math.sin(phase * 1.5) * 0.12 * amp;
+                        sx *= f; sy *= f; sz *= f;
+                    } else if (l.animPreset === 'wiggle') {
+                        rz += Math.sin(phase * 2.5) * 8 * amp;
+                        rx += Math.cos(phase * 2.0) * 5 * amp;
+                    } else if (l.animPreset === 'fadeIn') {
+                        const dur = masterDuration > 0 ? masterDuration : 3.0;
+                        op *= Math.min(1, (t * spd) / (dur * 0.4));
+                    } else if (l.animPreset === 'fadeOut') {
+                        const dur = masterDuration > 0 ? masterDuration : 3.0;
+                        op *= Math.max(0, 1 - (t * spd) / dur);
+                    }
                 }
 
-                // Apply Built-In Preset Animations (Around base user transform!)
-                const isBeingDragged = (transformControl.dragging && selectedIds.includes(l.id));
-                if (!isBeingDragged && globalPlaying && l.animPreset && l.animPreset !== 'none') {
-                    const spd = (l.animSpeed || 1.0) * 2.2;
-                    const amp = (l.animAmp || 1.0);
-                    const t = elapsed * spd;
-
-                    // Start from user's base transform
-                    let px = l.pos[0], py = l.pos[1], pz = l.pos[2];
-                    let sx = l.scale[0], sy = l.scale[1], sz = l.scale[2];
-                    let rx = l.rot[0], ry = l.rot[1], rz = l.rot[2];
-
-                    if (l.animPreset === 'float') {
-                        pz += Math.sin(t) * 0.06 * amp;
-                    } else if (l.animPreset === 'spinY') {
-                        ry = (ry + elapsed * 60 * (l.animSpeed || 1)) % 360;
-                    } else if (l.animPreset === 'spinZ') {
-                        rz = (rz + elapsed * 60 * (l.animSpeed || 1)) % 360;
-                    } else if (l.animPreset === 'pulse') {
-                        const factor = 1 + Math.sin(t * 1.5) * 0.12 * amp;
-                        sx *= factor; sy *= factor; sz *= factor;
-                    } else if (l.animPreset === 'wiggle') {
-                        rz += Math.sin(t * 2.5) * 8 * amp;
-                        rx += Math.cos(t * 2.0) * 5 * amp;
-                    } else if (l.animPreset === 'fadeIn' || l.animPreset === 'fadeOut') {
-                        const cycle = (elapsed * (l.animSpeed || 1) * 0.4) % 1;
-                        const alpha = l.animPreset === 'fadeIn' ? cycle : (1 - cycle);
-                        setMeshOpacity(l, alpha);
-                    }
-
+                if (!isBeingDragged) {
                     l.mesh.position.set(px, py, pz);
                     l.mesh.scale.set(sx, sy, sz);
                     l.mesh.rotation.set(
@@ -487,13 +850,60 @@
                         THREE.MathUtils.degToRad(ry),
                         THREE.MathUtils.degToRad(rz)
                     );
-                } else if (!isBeingDragged && l.animPreset === 'none') {
-                    setMeshOpacity(l, 1.0);
+                }
+
+                if (!l.isFolder && !l.isMaskPlane) {
+                    if (l.mesh.material && l.mesh.material.uniforms) {
+                        l.mesh.material.uniforms.similarity.value = sim;
+                        l.mesh.material.uniforms.smoothness.value = sm;
+                    }
+                    updateLayerClippingAndOpacity(l, op);
+                }
+
+                if (updateUIInputs && getPrimarySelectedItem()?.id === l.id) {
+                    document.getElementById('posX').value = parseFloat(px.toFixed(3));
+                    document.getElementById('posY').value = parseFloat(py.toFixed(3));
+                    document.getElementById('posZ').value = parseFloat(pz.toFixed(3));
+                    document.getElementById('scaleX').value = parseFloat(sx.toFixed(3));
+                    document.getElementById('scaleY').value = parseFloat(sy.toFixed(3));
+                    document.getElementById('scaleZ').value = parseFloat(sz.toFixed(3));
+                    document.getElementById('rotX').value = parseFloat(rx.toFixed(1));
+                    document.getElementById('rotY').value = parseFloat(ry.toFixed(1));
+                    document.getElementById('rotZ').value = parseFloat(rz.toFixed(1));
+                    document.getElementById('inpOpacity').value = op;
+                    document.getElementById('opacityVal').textContent = op.toFixed(2);
+                }
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            if (masterPlaying && masterDuration > 0) {
+                masterTime = (masterTime + delta) % masterDuration;
+                const scrubber = document.getElementById('masterTimelineScrubber');
+                if (document.activeElement !== scrubber) {
+                    scrubber.value = masterTime;
+                }
+            }
+
+            // Update 3D .glb animation mixers
+            layers.forEach(l => {
+                if (l.mixer && masterPlaying) {
+                    l.mixer.update(delta);
                 }
             });
 
-            // Update Playhead Scrubber Bar in Inspector for active Video or .glb Animation
-            updatePlayheadUI();
+            evaluateSceneAtTime(masterTime, false);
+
+            // Update Timecode Display
+            const disp = document.getElementById('masterTimeDisplay');
+            if (masterDuration > 0) {
+                disp.textContent = `${masterTime.toFixed(2)}s / ${masterDuration.toFixed(2)}s`;
+            } else {
+                disp.textContent = `0.00s / 0.00s (Static)`;
+            }
 
             if (camAnim) {
                 camAnim.progress += 0.12;
@@ -511,128 +921,16 @@
             renderer.render(scene, camera);
         }
 
-        function setMeshOpacity(layer, val) {
-            if (!layer.mesh) return;
-            layer.mesh.traverse(child => {
-                if (child.isMesh && child.material) {
-                    child.material.transparent = true;
-                    if (child.material.uniforms && child.material.uniforms.opacity) {
-                        child.material.uniforms.opacity.value = val;
-                    } else {
-                        child.material.opacity = val;
-                    }
-                }
-            });
-        }
-
         // ============================================================================
-        // 3. MULTI-SELECT (CTRL / SHIFT) & FOLDER GROUPING ENGINE
+        // 5. LAYER, CLIP MASK PLANE & FOLDER GROUPING ENGINE
         // ============================================================================
-        let layers = [];       // Holds both Media Layers and Folder Groups
-        let selectedIds = [];  // Supports Multi-Select!
+        let layers = [];
+        let selectedIds = [];
         let lastClickedId = null;
 
         function getPrimarySelectedItem() {
             if (selectedIds.length === 0) return null;
             return layers.find(l => l.id === selectedIds[selectedIds.length - 1]) || null;
-        }
-
-        // Group Selected Layers into a 3D Folder (Ctrl + G)
-        window.groupSelectedLayers = function() {
-            const validTargets = selectedIds
-                .map(id => layers.find(l => l.id === id))
-                .filter(l => l && !l.isFolder);
-
-            if (validTargets.length < 1) {
-                alert('Ctrl+Click or Shift+Click at least 1 or more layers in the Hierarchy to group them into a Folder!');
-                return;
-            }
-
-            const folderId = 'folder_' + Date.now();
-            const folderCount = layers.filter(l => l.isFolder).length + 1;
-            const folderGroup = new THREE.Group();
-            folderGroup.userData.layerId = folderId;
-            scene.add(folderGroup);
-
-            const folderObj = {
-                id: folderId,
-                name: `📁 Folder Group ${folderCount}`,
-                isFolder: true,
-                type: 'folder',
-                parentId: null,
-                pos: [0, 0, 0],
-                scale: [1, 1, 1],
-                rot: [0, 0, 0],
-                mesh: folderGroup
-            };
-
-            validTargets.forEach(child => {
-                child.parentId = folderId;
-                if (child.mesh) {
-                    folderGroup.attach(child.mesh); // Preserves world alignment while parenting!
-                    child.pos = [
-                        parseFloat(child.mesh.position.x.toFixed(3)),
-                        parseFloat(child.mesh.position.y.toFixed(3)),
-                        parseFloat(child.mesh.position.z.toFixed(3))
-                    ];
-                }
-            });
-
-            layers.push(folderObj);
-            selectSingleLayer(folderId);
-            saveHistoryState();
-            showToast(`📁 Grouped ${validTargets.length} layers into "${folderObj.name}"`);
-        };
-
-        window.ungroupSelectedFolder = function() {
-            const item = getPrimarySelectedItem();
-            if (!item) return;
-            const folder = item.isFolder ? item : layers.find(l => l.id === item.parentId);
-            if (!folder || !folder.isFolder) {
-                alert('Select a Folder Group (or a layer inside a folder) to ungroup it.');
-                return;
-            }
-
-            const children = layers.filter(l => l.parentId === folder.id);
-            children.forEach(ch => {
-                ch.parentId = null;
-                if (ch.mesh) {
-                    scene.attach(ch.mesh); // Preserves world position when ungrouping!
-                    ch.pos = [
-                        parseFloat(ch.mesh.position.x.toFixed(3)),
-                        parseFloat(ch.mesh.position.y.toFixed(3)),
-                        parseFloat(ch.mesh.position.z.toFixed(3))
-                    ];
-                    ch.scale = [
-                        parseFloat(ch.mesh.scale.x.toFixed(3)),
-                        parseFloat(ch.mesh.scale.y.toFixed(3)),
-                        parseFloat(ch.mesh.scale.z.toFixed(3))
-                    ];
-                    ch.rot = [
-                        parseFloat(THREE.MathUtils.radToDeg(ch.mesh.rotation.x).toFixed(1)),
-                        parseFloat(THREE.MathUtils.radToDeg(ch.mesh.rotation.y).toFixed(1)),
-                        parseFloat(THREE.MathUtils.radToDeg(ch.mesh.rotation.z).toFixed(1))
-                    ];
-                }
-            });
-
-            transformControl.detach();
-            scene.remove(folder.mesh);
-            layers = layers.filter(l => l.id !== folder.id);
-            selectedIds = children.map(c => c.id);
-            updateSelectionState();
-            saveHistoryState();
-            showToast('📂 Folder ungrouped');
-        };
-
-        // ============================================================================
-        // 4. UNIFIED MEDIA LAYER (AUTO-DETECTS MP4 / PNG / GLB, DEFAULTS TO 0, 0, 0)
-        // ============================================================================
-        function detectMediaType(urlOrFilename) {
-            const clean = urlOrFilename.split('?')[0].toLowerCase();
-            if (clean.endsWith('.glb') || clean.endsWith('.gltf')) return 'glb';
-            if (clean.endsWith('.png') || clean.endsWith('.jpg') || clean.endsWith('.jpeg') || clean.endsWith('.webp')) return 'image';
-            return 'video';
         }
 
         function createChromaMaterial(texture, hexColor, similarity, smoothness, enabled) {
@@ -645,13 +943,21 @@
                     similarity: { value: similarity },
                     smoothness: { value: smoothness },
                     enableChroma: { value: enabled ? 1.0 : 0.0 },
-                    opacity: { value: 1.0 }
+                    opacity: { value: 1.0 },
+                    useClip: { value: 0.0 },
+                    clipP0: { value: new THREE.Vector4() },
+                    clipP1: { value: new THREE.Vector4() },
+                    clipP2: { value: new THREE.Vector4() },
+                    clipP3: { value: new THREE.Vector4() }
                 },
                 vertexShader: `
                     varying vec2 vUv;
+                    varying vec3 vWorldPos;
                     void main() {
                         vUv = uv;
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                        vWorldPos = worldPosition.xyz;
+                        gl_Position = projectionMatrix * viewMatrix * worldPosition;
                     }
                 `,
                 fragmentShader: `
@@ -661,21 +967,33 @@
                     uniform float smoothness;
                     uniform float enableChroma;
                     uniform float opacity;
+                    uniform float useClip;
+                    uniform vec4 clipP0;
+                    uniform vec4 clipP1;
+                    uniform vec4 clipP2;
+                    uniform vec4 clipP3;
                     varying vec2 vUv;
+                    varying vec3 vWorldPos;
                     void main() {
+                        if (useClip > 0.5) {
+                            if (dot(vWorldPos, clipP0.xyz) + clipP0.w < 0.0) discard;
+                            if (dot(vWorldPos, clipP1.xyz) + clipP1.w < 0.0) discard;
+                            if (dot(vWorldPos, clipP2.xyz) + clipP2.w < 0.0) discard;
+                            if (dot(vWorldPos, clipP3.xyz) + clipP3.w < 0.0) discard;
+                        }
                         vec4 texColor = texture2D(src, vUv);
                         if (enableChroma > 0.5) {
                             float Y1 = 0.2989 * texColor.r + 0.5866 * texColor.g + 0.1145 * texColor.b;
                             float Cr1 = texColor.r - Y1;
                             float Cb1 = texColor.b - Y1;
-
                             float Y2 = 0.2989 * color.r + 0.5866 * color.g + 0.1145 * color.b;
                             float Cr2 = color.r - Y2;
                             float Cb2 = color.b - Y2;
-
                             float blend = smoothstep(similarity, similarity + max(smoothness, 0.001), distance(vec2(Cr1, Cb1), vec2(Cr2, Cb2)));
+                            if (blend * opacity < 0.01) discard;
                             gl_FragColor = vec4(texColor.rgb * blend, texColor.a * blend * opacity);
                         } else {
+                            if (texColor.a * opacity < 0.01) discard;
                             gl_FragColor = vec4(texColor.rgb, texColor.a * opacity);
                         }
                     }
@@ -683,16 +1001,23 @@
             });
         }
 
-        function createPlaceholderTexture(label) {
+        function createPlaceholderTexture(label, isMask = false) {
             const c = document.createElement('canvas');
             c.width = 512; c.height = 512;
             const ctx = c.getContext('2d');
-            ctx.fillStyle = 'rgba(30, 32, 48, 0.85)'; ctx.fillRect(0, 0, 512, 512);
-            ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 10; ctx.strokeRect(5, 5, 502, 502);
-            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText(label, 256, 235);
-            ctx.fillStyle = '#a1a1aa'; ctx.font = '17px sans-serif';
-            ctx.fillText('Paste .mp4 / .png / .glb Link in Inspector →', 256, 275);
+            ctx.fillStyle = isMask ? 'rgba(6, 182, 212, 0.18)' : 'rgba(30, 32, 48, 0.85)';
+            ctx.fillRect(0, 0, 512, 512);
+            ctx.strokeStyle = isMask ? '#06b6d4' : '#8b5cf6';
+            ctx.lineWidth = 10;
+            if (isMask) ctx.setLineDash([20, 12]);
+            ctx.strokeRect(5, 5, 502, 502);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 26px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, 256, 240);
+            ctx.fillStyle = isMask ? '#67e8f9' : '#a1a1aa';
+            ctx.font = '16px sans-serif';
+            ctx.fillText(isMask ? 'Invisible Clip Window on AR Output' : 'Paste .mp4 / .png / .glb Link →', 256, 280);
             return new THREE.CanvasTexture(c);
         }
 
@@ -701,40 +1026,48 @@
                 id: cfg.id,
                 name: cfg.name,
                 isFolder: !!cfg.isFolder,
+                isMaskPlane: !!cfg.isMaskPlane,
+                showMaskGuide: cfg.showMaskGuide !== undefined ? cfg.showMaskGuide : true,
                 parentId: cfg.parentId || null,
-                type: cfg.type || 'video',
+                type: cfg.type || (cfg.isMaskPlane ? 'mask' : 'video'),
                 url: cfg.url || '',
                 localBlobUrl: cfg.localBlobUrl || '',
                 pos: cfg.pos ? [...cfg.pos] : [0, 0, 0], // Default 0, 0, 0!
                 scale: cfg.scale ? [...cfg.scale] : [1, 1, 1],
                 rot: cfg.rot ? [...cfg.rot] : [0, 0, 0],
-                // Effects & Preset Animations
+                opacity: cfg.opacity !== undefined ? cfg.opacity : 1.0,
+                clipSource: cfg.clipSource || 'none', // 'none', 'target', or maskPlaneId
                 chromaEnabled: !!cfg.chromaEnabled,
                 color: cfg.color || '#00ff00',
                 similarity: cfg.similarity ?? 0.38,
                 smoothness: cfg.smoothness ?? 0.08,
-                portalMask: !!cfg.portalMask,
                 animPreset: cfg.animPreset || 'none',
                 animSpeed: cfg.animSpeed ?? 1.0,
                 animAmp: cfg.animAmp ?? 1.0,
-                // Runtime references
+                keyframes: cfg.keyframes ? JSON.parse(JSON.stringify(cfg.keyframes)) : {},
                 mesh: null,
                 videoEl: null,
                 mixer: null,
                 clips: [],
                 activeAction: null,
-                duration: 0,
-                isPlaying: true
+                duration: 0
             };
 
             if (layer.isFolder) {
                 const grp = new THREE.Group();
                 grp.userData.layerId = layer.id;
                 layer.mesh = grp;
-            } else {
-                const tex = createPlaceholderTexture(layer.name);
+            } else if (layer.isMaskPlane) {
+                const tex = createPlaceholderTexture(layer.name, true);
                 const geo = new THREE.PlaneGeometry(1, 1);
-                const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+                const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+                layer.mesh = new THREE.Mesh(geo, mat);
+                layer.mesh.userData.layerId = layer.id;
+                layer.mesh.visible = layer.showMaskGuide;
+            } else {
+                const tex = createPlaceholderTexture(layer.name, false);
+                const geo = new THREE.PlaneGeometry(1, 1);
+                const mat = createChromaMaterial(tex, layer.color, layer.similarity, layer.smoothness, false);
                 layer.mesh = new THREE.Mesh(geo, mat);
                 layer.mesh.userData.layerId = layer.id;
             }
@@ -753,43 +1086,62 @@
 
         window.addMediaLayer = function() {
             const id = 'layer_' + Date.now();
-            const count = layers.filter(l => !l.isFolder).length + 1;
-
+            const count = layers.filter(l => !l.isFolder && !l.isMaskPlane).length + 1;
             const layer = createLayerObject({
                 id,
                 name: `Layer ${count}`,
                 type: 'video',
-                pos: [0, 0, 0], // Always spawns at 0, 0, 0!
+                pos: [0, 0, 0],
                 scale: [1, 1, 1],
                 rot: [0, 0, 0]
             });
-
             layers.push(layer);
             selectSingleLayer(id);
+            updateMasterDuration();
             saveHistoryState();
             showToast(`➕ Added "${layer.name}" at (0, 0, 0)`);
         };
 
-        function applyMediaToLayer(layer, mediaSourceUrl, fileHint = '', silent = false) {
-            if (!mediaSourceUrl || layer.isFolder) return;
+        window.addClipMaskPlane = function() {
+            const id = 'mask_' + Date.now();
+            const count = layers.filter(l => l.isMaskPlane).length + 1;
+            const maskLayer = createLayerObject({
+                id,
+                name: `✂️ Clip Mask Plane ${count}`,
+                isMaskPlane: true,
+                type: 'mask',
+                pos: [0, 0, 0],
+                scale: [1, 1, 1],
+                rot: [0, 0, 0]
+            });
+            layers.push(maskLayer);
+            selectSingleLayer(id);
+            saveHistoryState();
+            showToast(`✂️ Added "${maskLayer.name}" — Assign any layer to clip inside it!`);
+        };
 
+        window.syncMaskPlaneGuide = function() {
+            const layer = getPrimarySelectedItem();
+            if (!layer || !layer.isMaskPlane) return;
+            layer.showMaskGuide = document.getElementById('maskGuideToggle').checked;
+            if (layer.mesh) layer.mesh.visible = layer.showMaskGuide;
+        };
+
+        function detectMediaType(urlOrFilename) {
+            const clean = urlOrFilename.split('?')[0].toLowerCase();
+            if (clean.endsWith('.glb') || clean.endsWith('.gltf')) return 'glb';
+            if (clean.endsWith('.png') || clean.endsWith('.jpg') || clean.endsWith('.jpeg') || clean.endsWith('.webp')) return 'image';
+            return 'video';
+        }
+
+        function applyMediaToLayer(layer, mediaSourceUrl, fileHint = '', silent = false) {
+            if (!mediaSourceUrl || layer.isFolder || layer.isMaskPlane) return;
             layer.type = detectMediaType(fileHint || layer.url || mediaSourceUrl);
-            if (!silent) showToast(`⏳ Loading ${layer.type.toUpperCase()} preview...`);
 
             const parentContainer = (layer.parentId && layers.find(l => l.id === layer.parentId)?.mesh) || scene;
 
-            // Clean up previous video/mixer
-            if (layer.videoEl) {
-                layer.videoEl.pause();
-                layer.videoEl.remove();
-                layer.videoEl = null;
-            }
-            if (layer.mixer) {
-                layer.mixer.stopAllAction();
-                layer.mixer = null;
-                layer.clips = [];
-                layer.activeAction = null;
-            }
+            if (layer.videoEl) { layer.videoEl.pause(); layer.videoEl.remove(); layer.videoEl = null; }
+            if (layer.mixer) { layer.mixer.stopAllAction(); layer.mixer = null; layer.clips = []; }
 
             if (layer.type === 'video') {
                 const vid = document.createElement('video');
@@ -799,14 +1151,12 @@
                 vid.muted = true;
                 vid.playsInline = true;
                 layer.videoEl = vid;
-                layer.isPlaying = globalPlaying;
-                if (globalPlaying) vid.play().catch(() => {});
+                if (masterPlaying) vid.play().catch(() => {});
 
                 const vidTex = new THREE.VideoTexture(vid);
                 vidTex.minFilter = THREE.LinearFilter;
                 vidTex.magFilter = THREE.LinearFilter;
 
-                // Ensure mesh is a Plane
                 if (layer.mesh.isGroup) {
                     transformControl.detach();
                     parentContainer.remove(layer.mesh);
@@ -822,12 +1172,12 @@
                         layer.mesh.geometry.dispose();
                         layer.mesh.geometry = new THREE.PlaneGeometry(1, aspect);
                     }
+                    updateMasterDuration();
                     refreshInspectorUI();
-                    if (!silent) showToast('🎬 Video loaded onto 3D Stage!');
+                    if (!silent) showToast('🎬 Video loaded & synced to Master Timeline!');
                 });
 
                 layer.mesh.material = createChromaMaterial(vidTex, layer.color, layer.similarity, layer.smoothness, layer.chromaEnabled);
-                applyPortalOrder(layer);
 
             } else if (layer.type === 'image') {
                 const img = new Image();
@@ -851,9 +1201,9 @@
 
                     layer.mesh.material = createChromaMaterial(tex, layer.color, layer.similarity, layer.smoothness, layer.chromaEnabled);
                     layer.duration = 0;
-                    applyPortalOrder(layer);
+                    updateMasterDuration();
                     refreshInspectorUI();
-                    if (!silent) showToast('🖼️ Image loaded onto 3D Stage!');
+                    if (!silent) showToast('🖼️ Image loaded!');
                 };
                 img.src = mediaSourceUrl;
 
@@ -885,19 +1235,17 @@
                     layer.mesh = wrapper;
                     parentContainer.add(wrapper);
 
-                    // Setup 3D Animation Scrubber if .glb has animations!
                     if (gltf.animations && gltf.animations.length > 0) {
                         layer.mixer = new THREE.AnimationMixer(model);
                         layer.clips = gltf.animations;
                         layer.activeAction = layer.mixer.clipAction(gltf.animations[0]);
                         layer.activeAction.play();
-                        layer.duration = gltf.animations[0].duration || 1;
-                        layer.isPlaying = globalPlaying;
+                        layer.duration = gltf.animations[0].duration || 0;
                     } else {
                         layer.duration = 0;
                     }
 
-                    applyPortalOrder(layer);
+                    updateMasterDuration();
                     if (selectedIds.includes(layer.id)) transformControl.attach(wrapper);
                     refreshInspectorUI();
                     if (!silent) showToast('🧊 3D .glb Model loaded!');
@@ -905,107 +1253,74 @@
             }
         }
 
-        function applyPortalOrder(layer) {
-            if (!layer.mesh) return;
-            layer.mesh.renderOrder = layer.portalMask ? 1 : 2;
-        }
-
         // ============================================================================
-        // 5. TIMELINE PLAYHEAD SCRUBBER (FOR BOTH VIDEOS & 3D .GLB ANIMATIONS!)
+        // 6. SELECTION, GROUPING & INSPECTOR SYNC
         // ============================================================================
-        function updatePlayheadUI() {
-            const layer = getPrimarySelectedItem();
-            if (!layer || layer.isFolder) return;
-            const scrubber = document.getElementById('timelineScrubber');
-            const display = document.getElementById('timecodeDisplay');
+        window.groupSelectedLayers = function() {
+            const validTargets = selectedIds
+                .map(id => layers.find(l => l.id === id))
+                .filter(l => l && !l.isFolder);
 
-            if (layer.type === 'video' && layer.videoEl && layer.duration > 0) {
-                const cur = layer.videoEl.currentTime || 0;
-                scrubber.max = layer.duration;
-                if (document.activeElement !== scrubber) {
-                    scrubber.value = cur;
-                }
-                display.textContent = `${cur.toFixed(2)}s / ${layer.duration.toFixed(2)}s`;
-            } else if (layer.type === 'glb' && layer.mixer && layer.activeAction && layer.duration > 0) {
-                const cur = layer.activeAction.time || 0;
-                scrubber.max = layer.duration;
-                if (document.activeElement !== scrubber) {
-                    scrubber.value = cur;
-                }
-                display.textContent = `${cur.toFixed(2)}s / ${layer.duration.toFixed(2)}s`;
+            if (validTargets.length < 1) {
+                alert('Ctrl+Click or Shift+Click layers in the Hierarchy to group them!');
+                return;
             }
-        }
 
-        window.scrubTimeline = function(val) {
-            const layer = getPrimarySelectedItem();
-            if (!layer) return;
-            const timeSec = parseFloat(val) || 0;
+            const folderId = 'folder_' + Date.now();
+            const count = layers.filter(l => l.isFolder).length + 1;
+            const folderObj = createLayerObject({
+                id: folderId,
+                name: `📁 Folder Group ${count}`,
+                isFolder: true,
+                type: 'folder',
+                pos: [0, 0, 0], scale: [1, 1, 1], rot: [0, 0, 0]
+            });
 
-            if (layer.type === 'video' && layer.videoEl) {
-                layer.videoEl.pause();
-                layer.isPlaying = false;
-                layer.videoEl.currentTime = timeSec;
-                document.getElementById('layerPlayPauseBtn').textContent = '▶️️ Play';
-            } else if (layer.type === 'glb' && layer.mixer && layer.activeAction) {
-                layer.isPlaying = false;
-                layer.activeAction.paused = false;
-                layer.mixer.setTime(timeSec);
-                document.getElementById('layerPlayPauseBtn').textContent = '▶️ Play';
-            }
-            document.getElementById('timecodeDisplay').textContent = `${timeSec.toFixed(2)}s / ${layer.duration.toFixed(2)}s`;
-        };
-
-        window.toggleSelectedMediaPlayback = function() {
-            const layer = getPrimarySelectedItem();
-            if (!layer) return;
-
-            if (layer.type === 'video' && layer.videoEl) {
-                if (layer.videoEl.paused) {
-                    layer.videoEl.play().catch(() => {});
-                    layer.isPlaying = true;
-                } else {
-                    layer.videoEl.pause();
-                    layer.isPlaying = false;
-                }
-            } else if (layer.type === 'glb' && layer.mixer) {
-                layer.isPlaying = !layer.isPlaying;
-            }
-            document.getElementById('layerPlayPauseBtn').textContent = layer.isPlaying ? '⏸ Pause' : '▶️ Play';
-        };
-
-        window.restartSelectedMedia = function() {
-            scrubTimeline(0);
-        };
-
-        window.changeGlbClip = function() {
-            const layer = getPrimarySelectedItem();
-            if (!layer || !layer.mixer || !layer.clips.length) return;
-            const idx = parseInt(document.getElementById('glbClipSelect').value, 10) || 0;
-            const clip = layer.clips[idx];
-            if (!clip) return;
-            layer.mixer.stopAllAction();
-            layer.activeAction = layer.mixer.clipAction(clip);
-            layer.activeAction.play();
-            layer.duration = clip.duration || 1;
-            layer.isPlaying = true;
-        };
-
-        window.toggleAllPlayback = function() {
-            globalPlaying = !globalPlaying;
-            layers.forEach(l => {
-                l.isPlaying = globalPlaying;
-                if (l.videoEl) {
-                    if (globalPlaying) l.videoEl.play().catch(() => {});
-                    else l.videoEl.pause();
+            validTargets.forEach(child => {
+                child.parentId = folderId;
+                if (child.mesh) {
+                    folderObj.mesh.attach(child.mesh);
+                    child.pos = [
+                        parseFloat(child.mesh.position.x.toFixed(3)),
+                        parseFloat(child.mesh.position.y.toFixed(3)),
+                        parseFloat(child.mesh.position.z.toFixed(3))
+                    ];
                 }
             });
-            document.getElementById('globalPlayPauseBtn').textContent = globalPlaying ? '⏸ Pause All' : '▶️ Play All';
-            refreshInspectorUI();
+
+            layers.push(folderObj);
+            selectSingleLayer(folderId);
+            saveHistoryState();
+            showToast(`📁 Grouped into "${folderObj.name}"`);
         };
 
-        // ============================================================================
-        // 6. SELECTION, INSPECTOR SYNC & KEYBOARD SHORTCUTS
-        // ============================================================================
+        window.ungroupSelectedFolder = function() {
+            const item = getPrimarySelectedItem();
+            if (!item) return;
+            const folder = item.isFolder ? item : layers.find(l => l.id === item.parentId);
+            if (!folder || !folder.isFolder) return;
+
+            const children = layers.filter(l => l.parentId === folder.id);
+            children.forEach(ch => {
+                ch.parentId = null;
+                if (ch.mesh) {
+                    scene.attach(ch.mesh);
+                    ch.pos = [
+                        parseFloat(ch.mesh.position.x.toFixed(3)),
+                        parseFloat(ch.mesh.position.y.toFixed(3)),
+                        parseFloat(ch.mesh.position.z.toFixed(3))
+                    ];
+                }
+            });
+
+            transformControl.detach();
+            scene.remove(folder.mesh);
+            layers = layers.filter(l => l.id !== folder.id);
+            selectedIds = children.map(c => c.id);
+            updateSelectionState();
+            saveHistoryState();
+        };
+
         window.selectSingleLayer = function(id) {
             selectedIds = id ? [id] : [];
             lastClickedId = id;
@@ -1014,20 +1329,15 @@
 
         window.handleLayerClick = function(id, event) {
             if (event && (event.ctrlKey || event.metaKey)) {
-                // Toggle in multi-selection
-                if (selectedIds.includes(id)) {
-                    selectedIds = selectedIds.filter(x => x !== id);
-                } else {
-                    selectedIds.push(id);
-                }
+                if (selectedIds.includes(id)) selectedIds = selectedIds.filter(x => x !== id);
+                else selectedIds.push(id);
                 lastClickedId = id;
             } else if (event && event.shiftKey && lastClickedId) {
-                // Range Shift-Select
                 const allIds = layers.map(l => l.id);
-                const start = allIds.indexOf(lastClickedId);
-                const end = allIds.indexOf(id);
-                if (start !== -1 && end !== -1) {
-                    const [low, high] = start < end ? [start, end] : [end, start];
+                const s = allIds.indexOf(lastClickedId);
+                const e = allIds.indexOf(id);
+                if (s !== -1 && e !== -1) {
+                    const [low, high] = s < e ? [s, e] : [e, s];
                     selectedIds = allIds.slice(low, high + 1);
                 }
             } else {
@@ -1056,6 +1366,7 @@
 
             if (primary.mesh) transformControl.attach(primary.mesh);
             refreshInspectorUI();
+            refreshKeyframeDiamonds();
         }
 
         function refreshInspectorUI() {
@@ -1063,49 +1374,51 @@
             if (!layer) return;
 
             document.getElementById('inpName').value = layer.name;
-            document.getElementById('mediaSourceCard').style.display = layer.isFolder ? 'none' : 'block';
-            if (!layer.isFolder) {
+            document.getElementById('maskPlaneCard').style.display = layer.isMaskPlane ? 'block' : 'none';
+            if (layer.isMaskPlane) {
+                document.getElementById('maskGuideToggle').checked = layer.showMaskGuide;
+            }
+
+            const isRegularMedia = (!layer.isFolder && !layer.isMaskPlane);
+            document.getElementById('mediaSourceCard').style.display = isRegularMedia ? 'block' : 'none';
+            document.getElementById('appearanceCard').style.display = isRegularMedia ? 'block' : 'none';
+            document.getElementById('effectsCard').style.display = isRegularMedia ? 'block' : 'none';
+
+            if (isRegularMedia) {
                 document.getElementById('inpUrl').value = layer.url;
+                document.getElementById('inpOpacity').value = layer.opacity ?? 1.0;
+                document.getElementById('opacityVal').textContent = (layer.opacity ?? 1.0).toFixed(2);
+
+                // Populate Clipping Mask Selector (Target Bounds + Any Custom Mask Planes!)
+                const clipSel = document.getElementById('clipSourceSelect');
+                const maskPlanes = layers.filter(m => m.isMaskPlane);
+                let optsHtml = `
+                    <option value="none">None (Bleed Freely Outside Frame)</option>
+                    <option value="target">🕳️ Target Image Bounds (Portal Window)</option>
+                `;
+                maskPlanes.forEach(mp => {
+                    optsHtml += `<option value="${mp.id}">✂️ ${mp.name}</option>`;
+                });
+                clipSel.innerHTML = optsHtml;
+                clipSel.value = layer.clipSource || 'none';
+
+                document.getElementById('animPreset').value = layer.animPreset || 'none';
+                document.getElementById('animParamsBox').style.display = (layer.animPreset && layer.animPreset !== 'none') ? 'block' : 'none';
+                document.getElementById('animSpeed').value = layer.animSpeed ?? 1.0;
+                document.getElementById('animAmp').value = layer.animAmp ?? 1.0;
+                document.getElementById('animSpeedVal').textContent = layer.animSpeed ?? 1.0;
+                document.getElementById('animAmpVal').textContent = layer.animAmp ?? 1.0;
+
+                const chromaSec = document.getElementById('chromaEffectSection');
+                chromaSec.style.display = (layer.type === 'video' || layer.type === 'image') ? 'block' : 'none';
+                document.getElementById('chromaToggle').checked = !!layer.chromaEnabled;
+                document.getElementById('chromaParamsBox').style.display = layer.chromaEnabled ? 'block' : 'none';
+                document.getElementById('chromaColor').value = layer.color || '#00ff00';
+                document.getElementById('chromaSim').value = layer.similarity ?? 0.38;
+                document.getElementById('chromaSmooth').value = layer.smoothness ?? 0.08;
             }
 
             populateInspectorNumbers(layer);
-
-            // Timeline Playhead visibility (shown for Video OR Animated .glb)
-            const hasTimeline = !layer.isFolder && ((layer.type === 'video' && layer.videoEl) || (layer.type === 'glb' && layer.clips && layer.clips.length > 0));
-            document.getElementById('timelineCard').style.display = hasTimeline ? 'block' : 'none';
-            if (hasTimeline) {
-                document.getElementById('timelineLabel').textContent = layer.type === 'glb' ? '🧊 3D Animation Playhead' : '🎬 Video Frame Scrubber';
-                document.getElementById('layerPlayPauseBtn').textContent = layer.isPlaying ? '⏸ Pause' : '▶️ Play';
-
-                const clipRow = document.getElementById('glbClipRow');
-                if (layer.type === 'glb' && layer.clips.length > 0) {
-                    clipRow.style.display = 'block';
-                    const sel = document.getElementById('glbClipSelect');
-                    sel.innerHTML = layer.clips.map((c, i) => `<option value="${i}">${c.name || ('Clip ' + (i+1))}</option>`).join('');
-                } else {
-                    clipRow.style.display = 'none';
-                }
-            }
-
-            // Preset Animations & Effects
-            document.getElementById('animPreset').value = layer.animPreset || 'none';
-            document.getElementById('animParamsBox').style.display = (layer.animPreset && layer.animPreset !== 'none') ? 'block' : 'none';
-            document.getElementById('animSpeed').value = layer.animSpeed ?? 1.0;
-            document.getElementById('animAmp').value = layer.animAmp ?? 1.0;
-            document.getElementById('animSpeedVal').textContent = layer.animSpeed ?? 1.0;
-            document.getElementById('animAmpVal').textContent = layer.animAmp ?? 1.0;
-
-            document.getElementById('portalToggle').checked = !!layer.portalMask;
-
-            const chromaSec = document.getElementById('chromaEffectSection');
-            chromaSec.style.display = (!layer.isFolder && (layer.type === 'video' || layer.type === 'image')) ? 'block' : 'none';
-            document.getElementById('chromaToggle').checked = !!layer.chromaEnabled;
-            document.getElementById('chromaParamsBox').style.display = layer.chromaEnabled ? 'block' : 'none';
-            document.getElementById('chromaColor').value = layer.color || '#00ff00';
-            document.getElementById('chromaSim').value = layer.similarity ?? 0.38;
-            document.getElementById('chromaSmooth').value = layer.smoothness ?? 0.08;
-            document.getElementById('simVal').textContent = layer.similarity ?? 0.38;
-            document.getElementById('smoothVal').textContent = layer.smoothness ?? 0.08;
         }
 
         function populateInspectorNumbers(layer) {
@@ -1127,26 +1440,8 @@
             renderLayerList();
         };
 
-        window.syncTransformFromInputs = function() {
-            const layer = getPrimarySelectedItem();
+        function applyTransformAndEffectsImmediate(layer) {
             if (!layer || !layer.mesh) return;
-
-            layer.pos = [
-                parseFloat(document.getElementById('posX').value) || 0,
-                parseFloat(document.getElementById('posY').value) || 0,
-                parseFloat(document.getElementById('posZ').value) || 0
-            ];
-            layer.scale = [
-                parseFloat(document.getElementById('scaleX').value) || 1,
-                parseFloat(document.getElementById('scaleY').value) || 1,
-                parseFloat(document.getElementById('scaleZ').value) || 1
-            ];
-            layer.rot = [
-                parseFloat(document.getElementById('rotX').value) || 0,
-                parseFloat(document.getElementById('rotY').value) || 0,
-                parseFloat(document.getElementById('rotZ').value) || 0
-            ];
-
             layer.mesh.position.set(...layer.pos);
             layer.mesh.scale.set(...layer.scale);
             layer.mesh.rotation.set(
@@ -1154,48 +1449,27 @@
                 THREE.MathUtils.degToRad(layer.rot[1]),
                 THREE.MathUtils.degToRad(layer.rot[2])
             );
-            renderLayerList();
-        };
+            updateLayerClippingAndOpacity(layer, layer.opacity ?? 1.0);
+        }
 
         window.syncEffectsFromInputs = function() {
             const layer = getPrimarySelectedItem();
-            if (!layer) return;
+            if (!layer || layer.isFolder || layer.isMaskPlane) return;
 
+            layer.clipSource = document.getElementById('clipSourceSelect').value;
             layer.animPreset = document.getElementById('animPreset').value;
-            layer.animSpeed = parseFloat(document.getElementById('animSpeed').value) || 1.0;
-            layer.animAmp = parseFloat(document.getElementById('animAmp').value) || 1.0;
             document.getElementById('animParamsBox').style.display = (layer.animPreset !== 'none') ? 'block' : 'none';
-            document.getElementById('animSpeedVal').textContent = layer.animSpeed;
-            document.getElementById('animAmpVal').textContent = layer.animAmp;
-
-            // Reset mesh to exact base transform if animation turned off
-            if (layer.animPreset === 'none' && layer.mesh) {
-                layer.mesh.position.set(...layer.pos);
-                layer.mesh.scale.set(...layer.scale);
-                layer.mesh.rotation.set(
-                    THREE.MathUtils.degToRad(layer.rot[0]),
-                    THREE.MathUtils.degToRad(layer.rot[1]),
-                    THREE.MathUtils.degToRad(layer.rot[2])
-                );
-            }
-
-            layer.portalMask = document.getElementById('portalToggle').checked;
-            applyPortalOrder(layer);
 
             layer.chromaEnabled = document.getElementById('chromaToggle').checked;
             document.getElementById('chromaParamsBox').style.display = layer.chromaEnabled ? 'block' : 'none';
             layer.color = document.getElementById('chromaColor').value;
-            layer.similarity = parseFloat(document.getElementById('chromaSim').value);
-            layer.smoothness = parseFloat(document.getElementById('chromaSmooth').value);
-            document.getElementById('simVal').textContent = layer.similarity;
-            document.getElementById('smoothVal').textContent = layer.smoothness;
 
             if (layer.mesh && layer.mesh.material && layer.mesh.material.uniforms) {
                 layer.mesh.material.uniforms.enableChroma.value = layer.chromaEnabled ? 1.0 : 0.0;
                 layer.mesh.material.uniforms.color.value.set(layer.color);
-                layer.mesh.material.uniforms.similarity.value = layer.similarity;
-                layer.mesh.material.uniforms.smoothness.value = layer.smoothness;
             }
+            updateLayerClippingAndOpacity(layer, layer.opacity ?? 1.0);
+            renderLayerList();
         };
 
         window.handleLocalFile = function(e) {
@@ -1229,21 +1503,18 @@
                 const layer = layers.find(l => l.id === id);
                 if (!layer) return;
                 if (layer.isFolder) {
-                    // Release children back to scene root
                     layers.filter(c => c.parentId === layer.id).forEach(ch => {
                         ch.parentId = null;
                         if (ch.mesh) scene.attach(ch.mesh);
                     });
                 }
                 if (layer.mesh && layer.mesh.parent) layer.mesh.parent.remove(layer.mesh);
-                if (layer.videoEl) {
-                    layer.videoEl.pause();
-                    layer.videoEl.remove();
-                }
+                if (layer.videoEl) { layer.videoEl.pause(); layer.videoEl.remove(); }
             });
 
             layers = layers.filter(l => !selectedIds.includes(l.id));
             selectedIds = layers.length ? [layers[layers.length - 1].id] : [];
+            updateMasterDuration();
             updateSelectionState();
             saveHistoryState();
         };
@@ -1255,15 +1526,10 @@
                 return;
             }
             list.innerHTML = '';
-
-            // Render Top-Level Items and Folder Children cleanly
-            const topLevel = layers.filter(l => !l.parentId);
-            topLevel.forEach(item => {
+            layers.filter(l => !l.parentId).forEach(item => {
                 appendHierarchyRow(list, item, false);
                 if (item.isFolder) {
-                    layers.filter(ch => ch.parentId === item.id).forEach(child => {
-                        appendHierarchyRow(list, child, true);
-                    });
+                    layers.filter(ch => ch.parentId === item.id).forEach(child => appendHierarchyRow(list, child, true));
                 }
             });
         }
@@ -1272,10 +1538,9 @@
             const item = document.createElement('div');
             const isPrimary = (selectedIds[selectedIds.length - 1] === l.id);
             const isMulti = selectedIds.includes(l.id);
-
             item.className = 'layer-item' + (isPrimary ? ' active' : (isMulti ? ' multi-selected' : '')) + (isChild ? ' child-layer' : '');
 
-            const icon = l.isFolder ? '' : (l.type === 'glb' ? '🧊 ' : (l.type === 'image' ? '🖼️ ' : '🎬 '));
+            const icon = l.isFolder ? '' : (l.isMaskPlane ? '' : (l.type === 'glb' ? '🧊 ' : (l.type === 'image' ? '🖼️ ' : '🎬 ')));
             const titleSpan = document.createElement('span');
             titleSpan.textContent = icon + l.name;
             titleSpan.style.flex = '1';
@@ -1285,12 +1550,12 @@
             rightGroup.style.alignItems = 'center';
 
             const zBadge = document.createElement('small');
-            zBadge.style.color = l.portalMask ? '#38bdf8' : '#a78bfa';
-            zBadge.textContent = `${l.portalMask ? '🕳️ ' : ''}Z: ${l.pos[2]}`;
+            const isClipped = (l.clipSource && l.clipSource !== 'none');
+            zBadge.style.color = isClipped ? '#38bdf8' : '#a78bfa';
+            zBadge.textContent = `${isClipped ? '✂️ ' : ''}Z:${l.pos[2]}`;
 
             const findBtn = document.createElement('button');
             findBtn.className = 'layer-focus-btn';
-            findBtn.title = 'Focus in Viewport (F)';
             findBtn.textContent = '🎯';
             findBtn.onclick = (e) => {
                 e.stopPropagation();
@@ -1300,7 +1565,6 @@
 
             rightGroup.appendChild(zBadge);
             rightGroup.appendChild(findBtn);
-
             item.appendChild(titleSpan);
             item.appendChild(rightGroup);
             item.onclick = (e) => handleLayerClick(l.id, e);
@@ -1308,7 +1572,7 @@
         }
 
         // ============================================================================
-        // 7. SHORTCUTS, SPACEBAR PANNING, FOCUS (F) & UNDO/REDO
+        // 7. SHORTCUTS, SPACEBAR PAN, FOCUS (F) & UNDO/REDO
         // ============================================================================
         let isSpacePressed = false;
 
@@ -1318,20 +1582,11 @@
 
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
                 e.preventDefault();
-                if (e.shiftKey) redo();
-                else undo();
+                if (e.shiftKey) redo(); else undo();
                 return;
             }
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-                e.preventDefault();
-                redo();
-                return;
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
-                e.preventDefault();
-                groupSelectedLayers();
-                return;
-            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') { e.preventDefault(); groupSelectedLayers(); return; }
 
             if (isTyping) return;
 
@@ -1347,10 +1602,7 @@
             if (key === 'w') setGizmoMode('translate');
             if (key === 'e') setGizmoMode('rotate');
             if (key === 'r') setGizmoMode('scale');
-            if (key === 'f') {
-                e.preventDefault();
-                focusSelectedLayer();
-            }
+            if (key === 'f') { e.preventDefault(); focusSelectedLayer(); }
         });
 
         window.addEventListener('keyup', (e) => {
@@ -1365,40 +1617,28 @@
             const layer = getPrimarySelectedItem();
             if (!layer || !layer.mesh) {
                 camAnim = {
-                    progress: 0,
-                    startPos: camera.position.clone(),
-                    startTarget: orbit.target.clone(),
-                    endTarget: new THREE.Vector3(0, 0, 0),
-                    endPos: new THREE.Vector3(0, -0.9, 1.4)
+                    progress: 0, startPos: camera.position.clone(), startTarget: orbit.target.clone(),
+                    endTarget: new THREE.Vector3(0, 0, 0), endPos: new THREE.Vector3(0, -0.9, 1.4)
                 };
-                showToast('🎯 Focused on Target Floor');
                 return;
             }
-
             const box = new THREE.Box3().setFromObject(layer.mesh);
             const center = new THREE.Vector3();
             const size = new THREE.Vector3();
-            box.getCenter(center);
-            box.getSize(size);
-
-            const maxDim = Math.max(size.x, size.y, size.z, 0.4);
-            const fitDistance = maxDim * 1.65;
-
+            box.getCenter(center); box.getSize(size);
+            const fitDistance = Math.max(size.x, size.y, size.z, 0.4) * 1.65;
             const dir = camera.position.clone().sub(orbit.target);
             if (dir.lengthSq() < 0.01) dir.set(0, -0.5, 1);
             dir.normalize();
 
             camAnim = {
-                progress: 0,
-                startPos: camera.position.clone(),
-                startTarget: orbit.target.clone(),
-                endTarget: center,
-                endPos: center.clone().add(dir.multiplyScalar(fitDistance))
+                progress: 0, startPos: camera.position.clone(), startTarget: orbit.target.clone(),
+                endTarget: center, endPos: center.clone().add(dir.multiplyScalar(fitDistance))
             };
             showToast(`🎯 Focused on "${layer.name}"`);
         };
 
-        // Undo / Redo Stack
+        // Undo / Redo History
         let historyStack = [];
         let historyIndex = -1;
         let isRestoringHistory = false;
@@ -1407,24 +1647,13 @@
             return JSON.stringify({
                 selectedIds,
                 layers: layers.map(l => ({
-                    id: l.id,
-                    name: l.name,
-                    isFolder: l.isFolder,
-                    parentId: l.parentId,
-                    type: l.type,
-                    url: l.url,
-                    localBlobUrl: l.localBlobUrl || '',
-                    pos: [...l.pos],
-                    scale: [...l.scale],
-                    rot: [...l.rot],
-                    chromaEnabled: l.chromaEnabled,
-                    color: l.color,
-                    similarity: l.similarity,
-                    smoothness: l.smoothness,
-                    portalMask: l.portalMask,
-                    animPreset: l.animPreset,
-                    animSpeed: l.animSpeed,
-                    animAmp: l.animAmp
+                    id: l.id, name: l.name, isFolder: l.isFolder, isMaskPlane: l.isMaskPlane,
+                    showMaskGuide: l.showMaskGuide, parentId: l.parentId, type: l.type, url: l.url,
+                    localBlobUrl: l.localBlobUrl || '', pos: [...l.pos], scale: [...l.scale], rot: [...l.rot],
+                    opacity: l.opacity, clipSource: l.clipSource, chromaEnabled: l.chromaEnabled,
+                    color: l.color, similarity: l.similarity, smoothness: l.smoothness,
+                    animPreset: l.animPreset, animSpeed: l.animSpeed, animAmp: l.animAmp,
+                    keyframes: l.keyframes
                 }))
             });
         }
@@ -1433,18 +1662,12 @@
             if (isRestoringHistory) return;
             const snap = serializeSceneState();
             if (historyIndex >= 0 && historyStack[historyIndex] === snap) return;
-
             historyStack = historyStack.slice(0, historyIndex + 1);
             historyStack.push(snap);
-            if (historyStack.length > 50) historyStack.shift();
-            else historyIndex++;
-            updateUndoRedoButtons();
-        };
-
-        function updateUndoRedoButtons() {
+            if (historyStack.length > 50) historyStack.shift(); else historyIndex++;
             document.getElementById('btn-undo').disabled = (historyIndex <= 0);
             document.getElementById('btn-redo').disabled = (historyIndex >= historyStack.length - 1);
-        }
+        };
 
         window.undo = function() {
             if (historyIndex <= 0) return;
@@ -1465,14 +1688,12 @@
             const state = JSON.parse(jsonSnap);
             transformControl.detach();
 
-            // Clear current meshes
             layers.forEach(l => {
                 if (l.mesh && l.mesh.parent) l.mesh.parent.remove(l.mesh);
                 if (l.videoEl) { l.videoEl.pause(); l.videoEl.remove(); }
             });
             layers = [];
 
-            // Rebuild folders first, then media layers
             state.layers.filter(s => s.isFolder).forEach(s => layers.push(createLayerObject(s)));
             state.layers.filter(s => !s.isFolder).forEach(s => {
                 const l = createLayerObject(s);
@@ -1481,18 +1702,20 @@
                     if (parentFolder && parentFolder.mesh) parentFolder.mesh.add(l.mesh);
                 }
                 const src = l.localBlobUrl || cleanDropbox(l.url);
-                if (src) applyMediaToLayer(l, src, l.url, true);
+                if (src && !l.isMaskPlane) applyMediaToLayer(l, src, l.url, true);
                 layers.push(l);
             });
 
             selectedIds = state.selectedIds || [];
+            updateMasterDuration();
             updateSelectionState();
-            updateUndoRedoButtons();
+            document.getElementById('btn-undo').disabled = (historyIndex <= 0);
+            document.getElementById('btn-redo').disabled = (historyIndex >= historyStack.length - 1);
             isRestoringHistory = false;
         }
 
         // ============================================================================
-        // 8. TARGET IMAGE, .MIND COMPILER, RAYCASTER & EXPORT
+        // 8. TARGET IMAGE, .MIND COMPILER & EXPORT TO V6 PLAYER
         // ============================================================================
         let activeTargetImageElement = null;
 
@@ -1526,7 +1749,6 @@
                 targetMesh.geometry = new THREE.PlaneGeometry(1, currentTargetAspect);
                 targetMat.map = tex;
                 targetMat.needsUpdate = true;
-                rebuildPortalMask(currentTargetAspect);
                 showToast('✅ Target Image applied to 3D Floor!');
             };
             img.src = srcUrl;
@@ -1596,7 +1818,6 @@
             orbit.update();
         };
 
-        // Raycaster Click Selection in Viewport
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         let downPos = { x: 0, y: 0 };
@@ -1609,7 +1830,7 @@
             mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
-            const meshes = layers.filter(l => !l.isFolder && l.mesh).map(l => l.mesh);
+            const meshes = layers.filter(l => !l.isFolder && l.mesh && l.mesh.visible).map(l => l.mesh);
             const intersects = raycaster.intersectObjects(meshes, true);
 
             if (intersects.length > 0) {
@@ -1619,13 +1840,19 @@
             }
         });
 
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
         window.exportProject = function() {
             const mind = document.getElementById('mindUrlInput').value.trim();
             if (!mind) {
                 alert('Please paste your Dropbox .mind file link in Step 1!');
                 return;
             }
-            const mediaLayers = layers.filter(l => !l.isFolder);
+            const mediaLayers = layers.filter(l => !l.isFolder && !l.isMaskPlane);
             if (mediaLayers.length === 0) {
                 alert('Please add at least one Media Layer!');
                 return;
@@ -1637,49 +1864,63 @@
                 return;
             }
 
-            // Export World Transforms (so grouped folder transforms bake cleanly for the player!)
-            const exportedLayers = mediaLayers.map(l => {
-                // Temporarily reset preset animation offset before reading world matrix
-                if (l.mesh) {
-                    l.mesh.position.set(...l.pos);
-                    l.mesh.scale.set(...l.scale);
-                    l.mesh.rotation.set(
-                        THREE.MathUtils.degToRad(l.rot[0]),
-                        THREE.MathUtils.degToRad(l.rot[1]),
-                        THREE.MathUtils.degToRad(l.rot[2])
-                    );
-                    l.mesh.updateMatrixWorld(true);
-                }
+            // Export Custom Clip Mask Planes (Always 100% invisible on output, used purely for clipping bounds!)
+            const exportedMasks = layers.filter(l => l.isMaskPlane).map(m => {
+                m.mesh.position.set(...m.pos);
+                m.mesh.scale.set(...m.scale);
+                m.mesh.rotation.set(
+                    THREE.MathUtils.degToRad(m.rot[0]),
+                    THREE.MathUtils.degToRad(m.rot[1]),
+                    THREE.MathUtils.degToRad(m.rot[2])
+                );
+                m.mesh.updateMatrixWorld(true);
+                const wp = new THREE.Vector3(), wq = new THREE.Quaternion(), ws = new THREE.Vector3();
+                m.mesh.matrixWorld.decompose(wp, wq, ws);
+                const we = new THREE.Euler().setFromQuaternion(wq);
+                return {
+                    id: m.id,
+                    p: [parseFloat(wp.x.toFixed(3)), parseFloat(wp.y.toFixed(3)), parseFloat(wp.z.toFixed(3))],
+                    s: [parseFloat(ws.x.toFixed(3)), parseFloat(ws.y.toFixed(3)), parseFloat(ws.z.toFixed(3))],
+                    r: [parseFloat(THREE.MathUtils.radToDeg(we.x).toFixed(1)), parseFloat(THREE.MathUtils.radToDeg(we.y).toFixed(1)), parseFloat(THREE.MathUtils.radToDeg(we.z).toFixed(1))]
+                };
+            });
 
-                const worldPos = new THREE.Vector3();
-                const worldQuat = new THREE.Quaternion();
-                const worldScale = new THREE.Vector3();
-                l.mesh.matrixWorld.decompose(worldPos, worldQuat, worldScale);
-                const worldEuler = new THREE.Euler().setFromQuaternion(worldQuat);
+            const exportedLayers = mediaLayers.map(l => {
+                l.mesh.position.set(...l.pos);
+                l.mesh.scale.set(...l.scale);
+                l.mesh.rotation.set(
+                    THREE.MathUtils.degToRad(l.rot[0]),
+                    THREE.MathUtils.degToRad(l.rot[1]),
+                    THREE.MathUtils.degToRad(l.rot[2])
+                );
+                l.mesh.updateMatrixWorld(true);
+                const wp = new THREE.Vector3(), wq = new THREE.Quaternion(), ws = new THREE.Vector3();
+                l.mesh.matrixWorld.decompose(wp, wq, ws);
+                const we = new THREE.Euler().setFromQuaternion(wq);
 
                 return {
                     t: l.chromaEnabled ? 'chroma' : l.type,
                     u: l.url,
-                    p: [parseFloat(worldPos.x.toFixed(3)), parseFloat(worldPos.y.toFixed(3)), parseFloat(worldPos.z.toFixed(3))],
-                    s: [parseFloat(worldScale.x.toFixed(3)), parseFloat(worldScale.y.toFixed(3)), parseFloat(worldScale.z.toFixed(3))],
-                    r: [
-                        parseFloat(THREE.MathUtils.radToDeg(worldEuler.x).toFixed(1)),
-                        parseFloat(THREE.MathUtils.radToDeg(worldEuler.y).toFixed(1)),
-                        parseFloat(THREE.MathUtils.radToDeg(worldEuler.z).toFixed(1))
-                    ],
+                    p: [parseFloat(wp.x.toFixed(3)), parseFloat(wp.y.toFixed(3)), parseFloat(wp.z.toFixed(3))],
+                    s: [parseFloat(ws.x.toFixed(3)), parseFloat(ws.y.toFixed(3)), parseFloat(ws.z.toFixed(3))],
+                    r: [parseFloat(THREE.MathUtils.radToDeg(we.x).toFixed(1)), parseFloat(THREE.MathUtils.radToDeg(we.y).toFixed(1)), parseFloat(THREE.MathUtils.radToDeg(we.z).toFixed(1))],
+                    op: l.opacity ?? 1.0,
+                    cs: l.clipSource || 'none',
                     c: l.color,
                     sim: l.similarity,
                     sm: l.smoothness,
-                    pm: l.portalMask ? 1 : 0,
                     ap: l.animPreset || 'none',
                     as: l.animSpeed ?? 1.0,
-                    aa: l.animAmp ?? 1.0
+                    aa: l.animAmp ?? 1.0,
+                    kf: l.keyframes || {}
                 };
             });
 
             const cleanConfig = {
                 m: mind,
                 ta: currentTargetAspect,
+                dur: masterDuration,
+                masks: exportedMasks,
                 l: exportedLayers
             };
 
