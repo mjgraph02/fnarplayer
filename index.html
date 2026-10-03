@@ -5,11 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Nizhali V6 — Universal AR Player</title>
 
-    <!-- 1. Self-Hosted A-Frame Core -->
     <script src="./aframe.min.js"></script>
 
     <script>
-        // Universal Cross-Platform GLSL Chroma Key Shader (iOS WebKit, Android Blink, Desktop Chromium/Gecko)
+        // 1. Universal Chroma Key Shader
         AFRAME.registerShader('chromakey', {
             schema: {
                 src: { type: 'map', is: 'uniform' },
@@ -30,114 +29,115 @@
                 #else
                 precision mediump float;
                 #endif
-
                 uniform sampler2D src;
                 uniform vec3 color;
                 uniform float similarity;
                 uniform float smoothness;
                 varying vec2 vUv;
-
                 void main() {
                     vec4 texColor = texture2D(src, vUv);
-                    
-                    // Convert RGB to YCrCb color space for lighting-independent color isolation
                     float Y1 = 0.2989 * texColor.r + 0.5866 * texColor.g + 0.1145 * texColor.b;
                     float Cr1 = texColor.r - Y1;
                     float Cb1 = texColor.b - Y1;
-
                     float Y2 = 0.2989 * color.r + 0.5866 * color.g + 0.1145 * color.b;
                     float Cr2 = color.r - Y2;
                     float Cb2 = color.b - Y2;
-
                     float dist = distance(vec2(Cr1, Cb1), vec2(Cr2, Cb2));
                     float blend = smoothstep(similarity, similarity + max(smoothness, 0.001), dist);
-
                     gl_FragColor = vec4(texColor.rgb * blend, texColor.a * blend);
                 }
             `
         });
+
+        // 2. Invisible Depth-Buffer Portal Window Mask Component (Hides negative-Z layers outside the print!)
+        AFRAME.registerComponent('portal-occluder', {
+            schema: { aspect: { type: 'number', default: 1.0 } },
+            init: function() {
+                const THREE = AFRAME.THREE;
+                const aspect = this.data.aspect;
+                const maskMat = new THREE.MeshBasicMaterial({
+                    colorWrite: false, // Invisible to camera feed!
+                    depthWrite: true,  // Blocks 3D objects behind it!
+                    side: THREE.DoubleSide
+                });
+                const M = 15;
+                const hW = 0.5;
+                const hH = aspect / 2;
+                const grp = new THREE.Group();
+
+                const topP = new THREE.Mesh(new THREE.PlaneGeometry(M, (M - aspect) / 2), maskMat);
+                topP.position.set(0, hH + (M - aspect) / 4, 0);
+                const botP = new THREE.Mesh(new THREE.PlaneGeometry(M, (M - aspect) / 2), maskMat);
+                botP.position.set(0, -hH - (M - aspect) / 4, 0);
+                const leftP = new THREE.Mesh(new THREE.PlaneGeometry((M - 1) / 2, aspect), maskMat);
+                leftP.position.set(-hW - (M - 1) / 4, 0, 0);
+                const rightP = new THREE.Mesh(new THREE.PlaneGeometry((M - 1) / 2, aspect), maskMat);
+                rightP.position.set(hW + (M - 1) / 4, 0, 0);
+
+                [topP, botP, leftP, rightP].forEach(p => {
+                    p.renderOrder = 0;
+                    grp.add(p);
+                });
+                this.el.setObject3D('mesh', grp);
+            }
+        });
+
+        // 3. Built-In Preset Animations Component
+        AFRAME.registerComponent('nizhali-anim', {
+            schema: {
+                preset: { type: 'string', default: 'none' },
+                speed: { type: 'number', default: 1.0 },
+                amp: { type: 'number', default: 1.0 },
+                basePos: { type: 'vec3' },
+                baseScale: { type: 'vec3' },
+                baseRot: { type: 'vec3' }
+            },
+            init: function() {
+                this.startTime = performance.now();
+                this.el.object3D.renderOrder = 1;
+            },
+            tick: function(time) {
+                const d = this.data;
+                if (!d.preset || d.preset === 'none') return;
+                const elapsed = (time - this.startTime) / 1000;
+                const t = elapsed * d.speed * 2.2;
+                const obj = this.el.object3D;
+
+                let px = d.basePos.x, py = d.basePos.y, pz = d.basePos.z;
+                let sx = d.baseScale.x, sy = d.baseScale.y, sz = d.baseScale.z;
+                let rx = d.baseRot.x, ry = d.baseRot.y, rz = d.baseRot.z;
+
+                if (d.preset === 'float') {
+                    pz += Math.sin(t) * 0.06 * d.amp;
+                } else if (d.preset === 'spinY') {
+                    ry = (ry + elapsed * 60 * d.speed) % 360;
+                } else if (d.preset === 'spinZ') {
+                    rz = (rz + elapsed * 60 * d.speed) % 360;
+                } else if (d.preset === 'pulse') {
+                    const f = 1 + Math.sin(t * 1.5) * 0.12 * d.amp;
+                    sx *= f; sy *= f; sz *= f;
+                } else if (d.preset === 'wiggle') {
+                    rz += Math.sin(t * 2.5) * 8 * d.amp;
+                    rx += Math.cos(t * 2.0) * 5 * d.amp;
+                }
+
+                obj.position.set(px, py, pz);
+                obj.scale.set(sx, sy, sz);
+                obj.rotation.set(
+                    AFRAME.THREE.MathUtils.degToRad(rx),
+                    AFRAME.THREE.MathUtils.degToRad(ry),
+                    AFRAME.THREE.MathUtils.degToRad(rz)
+                );
+            }
+        });
     </script>
 
     <style>
-        :root {
-            --app-height: 100%;
-        }
-
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            height: 100dvh;
-            position: relative;
-            overflow: hidden;
-            background: transparent !important;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        /* 3D Scene Layer */
-        a-scene {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            z-index: 1;
-        }
-
-        /* Universal Fullscreen Camera Viewport handling for Android Navigation & iOS Safari Bars */
-        .mindar-ui-overlay {
-            z-index: 2 !important;
-        }
-
-        #status {
-            position: fixed;
-            top: calc(16px + env(safe-area-inset-top));
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 15, 20, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            color: #00ff88;
-            padding: 10px 20px;
-            border-radius: 30px;
-            font-size: 13px;
-            font-weight: 600;
-            z-index: 99999;
-            pointer-events: none;
-            text-align: center;
-            max-width: 88%;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-            transition: opacity 0.3s ease;
-            white-space: nowrap;
-        }
-
-        #unmute-btn {
-            position: fixed;
-            bottom: calc(28px + env(safe-area-inset-bottom));
-            left: 50%;
-            transform: translateX(-50%);
-            display: none;
-            background: #ffffff;
-            color: #111111;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 30px;
-            font-size: 14px;
-            font-weight: 700;
-            z-index: 99999;
-            cursor: pointer;
-            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.5);
-            transition: transform 0.15s ease, background 0.2s ease;
-        }
-
-        #unmute-btn:active {
-            transform: translateX(-50%) scale(0.95);
-        }
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh; position: relative; overflow: hidden; background: transparent !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
+        a-scene { position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; z-index: 1; }
+        .mindar-ui-overlay { z-index: 2 !important; }
+        #status { position: fixed; top: calc(16px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(12px); color: #00ff88; padding: 10px 20px; border-radius: 30px; font-size: 13px; font-weight: 600; z-index: 99999; pointer-events: none; text-align: center; border: 1px solid rgba(255,255,255,0.15); transition: opacity 0.3s ease; white-space: nowrap; }
+        #unmute-btn { position: fixed; bottom: calc(28px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: none; background: #ffffff; color: #111111; border: none; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 99999; cursor: pointer; box-shadow: 0 4px 25px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
@@ -154,7 +154,6 @@
         let isMuted = true;
         let activeTargetFound = false;
 
-        // Handles standard, shared, and tokenized cloud storage URLs cleanly across browsers
         function cleanStorageUrl(url) {
             if (!url) return '';
             let clean = url.trim();
@@ -170,122 +169,82 @@
             try {
                 const params = new URLSearchParams(window.location.search);
                 let mindUrl = '';
+                let targetAspect = 1.0;
                 let layers = [];
 
-                // 1. Resolve Configuration (Studio Scene Mode vs Query String Direct Mode)
                 if (params.get('scene')) {
                     const decoded = JSON.parse(decodeURIComponent(atob(params.get('scene'))));
                     mindUrl = cleanStorageUrl(decoded.m);
+                    targetAspect = decoded.ta || 1.0;
                     layers = decoded.l.map(item => ({
                         type: item.t,
                         url: cleanStorageUrl(item.u),
+                        posArr: item.p || [0,0,0],
+                        scaleArr: item.s || [1,1,1],
+                        rotArr: item.r || [0,0,0],
                         pos: (item.p || [0,0,0]).join(' '),
                         scale: (item.s || [1,1,1]).join(' '),
                         rot: (item.r || [0,0,0]).join(' '),
                         color: item.c || '#00ff00',
                         similarity: item.sim ?? 0.38,
-                        smoothness: item.sm ?? 0.08
+                        smoothness: item.sm ?? 0.08,
+                        portalMask: !!item.pm,
+                        animPreset: item.ap || 'none',
+                        animSpeed: item.as ?? 1.0,
+                        animAmp: item.aa ?? 1.0
                     }));
                 } else {
                     mindUrl = cleanStorageUrl(params.get('mind'));
                     const videoParam = params.get('video');
                     if (videoParam) {
-                        const videoList = videoParam.split(',');
-                        layers = videoList.map((vUrl, idx) => ({
+                        layers = videoParam.split(',').map((vUrl, idx) => ({
                             type: 'video',
                             url: cleanStorageUrl(vUrl),
-                            pos: '0 0 0',
-                            scale: '1 1 1',
-                            rot: '0 0 0',
-                            targetIndex: idx
+                            posArr: [0,0,0], scaleArr: [1,1,1], rotArr: [0,0,0],
+                            pos: '0 0 0', scale: '1 1 1', rot: '0 0 0',
+                            animPreset: 'none', animSpeed: 1, animAmp: 1
                         }));
                     }
                 }
 
                 if (!mindUrl || layers.length === 0) {
-                    statusEl.textContent = '❌ Missing ?mind= or ?video= in URL';
+                    statusEl.textContent = '❌ Missing ?scene= or ?mind= in URL';
                     return;
                 }
 
-                // 2. Fetch tracking target as binary array buffer
                 statusEl.textContent = '1/2 Loading AR Target...';
                 const checkRes = await fetch(mindUrl);
                 if (!checkRes.ok) throw new Error(`Target file error (${checkRes.status})`);
                 const mindBuffer = await checkRes.arrayBuffer();
-                if (mindBuffer.byteLength < 1000) throw new Error('Target file is corrupted or incomplete');
-                
                 const localMindBlobUrl = URL.createObjectURL(new Blob([mindBuffer]));
 
                 statusEl.textContent = '2/2 Starting Camera...';
 
-                // 3. Build Asset and Entity trees with universal mobile/desktop attributes
                 let assetsHtml = '';
                 let entitiesHtml = '';
 
+                // If any layer uses Portal Window Mask, inject the invisible depth-occluder ring at Z = 0!
+                if (layers.some(l => l.portalMask)) {
+                    entitiesHtml += `<a-entity portal-occluder="aspect: ${targetAspect}"></a-entity>`;
+                }
+
                 layers.forEach((l, idx) => {
-                    const targetIdx = l.targetIndex !== undefined ? l.targetIndex : 0;
+                    const animAttr = `nizhali-anim="preset: ${l.animPreset}; speed: ${l.animSpeed}; amp: ${l.animAmp}; basePos: ${l.pos}; baseScale: ${l.scale}; baseRot: ${l.rot}"`;
 
                     if (l.type === 'video' || l.type === 'chroma') {
-                        assetsHtml += `
-                            <video id="vid-${idx}" 
-                                   src="${l.url}" 
-                                   preload="auto" 
-                                   loop 
-                                   muted 
-                                   playsinline 
-                                   webkit-playsinline 
-                                   crossorigin="anonymous">
-                            </video>
-                        `;
-
+                        assetsHtml += `<video id="vid-${idx}" src="${l.url}" preload="auto" loop muted playsinline webkit-playsinline crossorigin="anonymous"></video>`;
                         if (l.type === 'chroma') {
-                            entitiesHtml += `
-                                <a-plane id="ent-${idx}" 
-                                         position="${l.pos}" 
-                                         scale="${l.scale}" 
-                                         rotation="${l.rot}" 
-                                         width="1" 
-                                         height="1" 
-                                         material="shader: chromakey; src: #vid-${idx}; color: ${l.color}; similarity: ${l.similarity}; smoothness: ${l.smoothness}; transparent: true; side: double">
-                                </a-plane>
-                            `;
+                            entitiesHtml += `<a-plane id="ent-${idx}" position="${l.pos}" scale="${l.scale}" rotation="${l.rot}" ${animAttr} width="1" height="1" material="shader: chromakey; src: #vid-${idx}; color: ${l.color}; similarity: ${l.similarity}; smoothness: ${l.smoothness}; transparent: true; side: double"></a-plane>`;
                         } else {
-                            entitiesHtml += `
-                                <a-video id="ent-${idx}" 
-                                         src="#vid-${idx}" 
-                                         position="${l.pos}" 
-                                         scale="${l.scale}" 
-                                         rotation="${l.rot}" 
-                                         width="1" 
-                                         height="1">
-                                </a-video>
-                            `;
+                            entitiesHtml += `<a-video id="ent-${idx}" src="#vid-${idx}" position="${l.pos}" scale="${l.scale}" rotation="${l.rot}" ${animAttr} width="1" height="1"></a-video>`;
                         }
                     } else if (l.type === 'image') {
-                        entitiesHtml += `
-                            <a-image id="ent-${idx}" 
-                                     src="${l.url}" 
-                                     position="${l.pos}" 
-                                     scale="${l.scale}" 
-                                     rotation="${l.rot}" 
-                                     width="1" 
-                                     height="1" 
-                                     material="transparent: true; alphaTest: 0.05; side: double">
-                            </a-image>
-                        `;
+                        entitiesHtml += `<a-image id="ent-${idx}" src="${l.url}" position="${l.pos}" scale="${l.scale}" rotation="${l.rot}" ${animAttr} width="1" height="1" material="transparent: true; alphaTest: 0.02; side: double"></a-image>`;
                     } else if (l.type === 'glb') {
-                        entitiesHtml += `
-                            <a-gltf-model id="ent-${idx}" 
-                                          src="${l.url}" 
-                                          position="${l.pos}" 
-                                          scale="${l.scale}" 
-                                          rotation="${l.rot}">
-                            </a-gltf-model>
-                        `;
+                        entitiesHtml += `<a-gltf-model id="ent-${idx}" src="${l.url}" position="${l.pos}" scale="${l.scale}" rotation="${l.rot}" ${animAttr}></a-gltf-model>`;
                     }
                 });
 
-                // Device Pixel Ratio clamp prevents 3x/4x mobile GPU stalls while guaranteeing HD sharpness
                 window.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2.0);
 
                 const sceneWrapper = document.createElement('div');
@@ -313,7 +272,6 @@
                 const sceneEl = document.getElementById('ar-scene');
                 const targetRoot = document.getElementById('target-root');
 
-                // Bind Video Aspect Ratio and Autoplay handling
                 layers.forEach((l, idx) => {
                     if (l.type === 'video' || l.type === 'chroma') {
                         const vid = document.getElementById(`vid-${idx}`);
@@ -321,37 +279,26 @@
                         videoElements.push(vid);
 
                         vid.addEventListener('loadedmetadata', () => {
-                            if (vid.videoWidth && vid.videoHeight && l.scale === '1 1 1') {
+                            if (vid.videoWidth && vid.videoHeight) {
                                 ent.setAttribute('height', (vid.videoHeight / vid.videoWidth).toFixed(4));
                             }
                         });
                     }
                 });
 
-                // Universal Tracking Handlers
                 targetRoot.addEventListener('targetFound', () => {
                     activeTargetFound = true;
                     statusEl.textContent = '🎯 Target Locked';
-                    setTimeout(() => { 
-                        if (activeTargetFound) statusEl.style.opacity = '0'; 
-                    }, 1500);
-
+                    setTimeout(() => { if (activeTargetFound) statusEl.style.opacity = '0'; }, 1500);
                     videoElements.forEach(vid => {
                         vid.muted = isMuted;
-                        const promise = vid.play();
-                        if (promise !== undefined) {
-                            promise.catch(() => {
-                                // Fallback for strict browser autonomy policies: play muted first
-                                vid.muted = true;
-                                isMuted = true;
-                                vid.play();
-                            });
-                        }
+                        vid.play().catch(() => {
+                            vid.muted = true;
+                            isMuted = true;
+                            vid.play();
+                        });
                     });
-
-                    if (videoElements.length > 0) {
-                        unmuteBtn.style.display = 'block';
-                    }
+                    if (videoElements.length > 0) unmuteBtn.style.display = 'block';
                 });
 
                 targetRoot.addEventListener('targetLost', () => {
@@ -365,16 +312,11 @@
                     statusEl.textContent = '✅ AR Ready! Scan Print';
                 });
 
-                sceneEl.addEventListener('arError', () => {
-                    statusEl.textContent = '❌ Camera or AR target error';
-                });
-
             } catch (err) {
                 statusEl.textContent = '❌ ' + err.message;
             }
         }
 
-        // Global User-Gesture Audio Unlock (Works across iOS Safari/Brave, Android Chrome, and Desktop)
         function toggleAudio() {
             isMuted = !isMuted;
             videoElements.forEach(vid => {
@@ -385,11 +327,7 @@
         }
 
         unmuteBtn.addEventListener('click', toggleAudio);
-        unmuteBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            toggleAudio();
-        });
-
+        unmuteBtn.addEventListener('touchend', (e) => { e.preventDefault(); toggleAudio(); });
         window.addEventListener('load', bootV6);
     </script>
 </body>
