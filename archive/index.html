@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Nizhali V6 — Universal AR Player</title>
+
+    <script src="./aframe.min.js"></script>
+
+    <script>
+        // 1. Universal Chroma Key + 4-Plane 3D Portal/Mask Clipping Shader (Works at both +Z and -Z!)
+        AFRAME.registerShader('nizhali-surface', {
+            schema: {
+                src: { type: 'map', is: 'uniform' },
+                color: { type: 'color', default: '#00ff00', is: 'uniform' },
+                similarity: { type: 'number', default: 0.38, is: 'uniform' },
+                smoothness: { type: 'number', default: 0.08, is: 'uniform' },
+                enableChroma: { type: 'number', default: 0.0, is: 'uniform' },
+                opacity: { type: 'number', default: 1.0, is: 'uniform' },
+                useClip: { type: 'number', default: 0.0, is: 'uniform' },
+                clipP0: { type: 'vec4', is: 'uniform' },
+                clipP1: { type: 'vec4', is: 'uniform' },
+                clipP2: { type: 'vec4', is: 'uniform' },
+                clipP3: { type: 'vec4', is: 'uniform' }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                varying vec3 vWorldPos;
+                void main() {
+                    vUv = uv;
+                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                    vWorldPos = worldPosition.xyz;
+                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                }
+            `,
+            fragmentShader: `
+                #ifdef GL_FRAGMENT_PRECISION_HIGH
+                precision highp float;
+                #else
+                precision mediump float;
+                #endif
+                uniform sampler2D src;
+                uniform vec3 color;
+                uniform float similarity;
+                uniform float smoothness;
+                uniform float enableChroma;
+                uniform float opacity;
+                uniform float useClip;
+                uniform vec4 clipP0;
+                uniform vec4 clipP1;
+                uniform vec4 clipP2;
+                uniform vec4 clipP3;
+                varying vec2 vUv;
+                varying vec3 vWorldPos;
+                void main() {
+                    if (useClip > 0.5) {
+                        if (dot(vWorldPos, clipP0.xyz) + clipP0.w < 0.0) discard;
+                        if (dot(vWorldPos, clipP1.xyz) + clipP1.w < 0.0) discard;
+                        if (dot(vWorldPos, clipP2.xyz) + clipP2.w < 0.0) discard;
+                        if (dot(vWorldPos, clipP3.xyz) + clipP3.w < 0.0) discard;
+                    }
+                    vec4 texColor = texture2D(src, vUv);
+                    if (enableChroma > 0.5) {
+                        float Y1 = 0.2989 * texColor.r + 0.5866 * texColor.g + 0.1145 * texColor.b;
+                        float Cr1 = texColor.r - Y1;
+                        float Cb1 = texColor.b - Y1;
+                        float Y2 = 0.2989 * color.r + 0.5866 * color.g + 0.1145 * color.b;
+                        float Cr2 = color.r - Y2;
+                        float Cb2 = color.b - Y2;
+                        float dist = distance(vec2(Cr1, Cb1), vec2(Cr2, Cb2));
+                        float blend = smoothstep(similarity, similarity + max(smoothness, 0.001), dist);
+                        if (blend * opacity < 0.01) discard;
+                        gl_FragColor = vec4(texColor.rgb * blend, texColor.a * blend * opacity);
+                    } else {
+                        if (texColor.a * opacity < 0.01) discard;
+                        gl_FragColor = vec4(texColor.rgb, texColor.a * opacity);
+                    }
+                }
+            `
+        });
+
+        // 2. Per-Layer Keyframe + Preset Animation + 3D Mask Clipping Controller
+        AFRAME.registerComponent('nizhali-layer', {
+            schema: {
+                configJson: { type: 'string', default: '{}' },
+                targetAspect: { type: 'number', default: 1.0 },
+                masterDuration: { type: 'number', default: 0.0 }
+            },
+            init: function() {
+                this.cfg = JSON.parse(decodeURIComponent(this.data.configJson));
+                this.startTime = performance.now();
+                this.el.sceneEl.renderer.localClippingEnabled = true;
+            },
+            evalKf: function(param, baseVal, t) {
+                const kfs = this.cfg.kf && this.cfg.kf[param];
+                if (!kfs || kfs.length === 0) return baseVal;
+                if (kfs.length === 1 || t <= kfs[0].t) return kfs[0].v;
+                if (t >= kfs[kfs.length - 1].t) return kfs[kfs.length - 1].v;
+                for (let i = 0; i < kfs.length - 1; i++) {
+                    if (t >= kfs[i].t && t <= kfs[i + 1].t) {
+                        const span = kfs[i + 1].t - kfs[i].t;
+                        const r = span > 0.0001 ? (t - kfs[i].t) / span : 0;
+                        const sr = r * r * (3 - 2 * r);
+                        return kfs[i].v + (kfs[i + 1].v - kfs[i].v) * sr;
+                    }
+                }
+                return baseVal;
+            },
+            computeClipPlanes: function() {
+                const cs = this.cfg.cs;
+                if (!cs || cs === 'none') return null;
+                const THREE = AFRAME.THREE;
+                const targetRoot = document.getElementById('target-root');
+                if (!targetRoot) return null;
+
+                let refObj = targetRoot.object3D;
+                let halfW = 0.5;
+                let halfH = this.data.targetAspect / 2;
+
+                if (cs !== 'target') {
+                    const maskEl = document.getElementById('mask-' + cs);
+                    if (!maskEl) return null;
+                    refObj = maskEl.object3D;
+                    halfW = 0.5;
+                    halfH = 0.5;
+                }
+
+                refObj.updateMatrixWorld(true);
+                const m = refObj.matrixWorld;
+                return [
+                    new THREE.Plane(new THREE.Vector3( 1,  0, 0), halfW).applyMatrix4(m),
+                    new THREE.Plane(new THREE.Vector3(-1,  0, 0), halfW).applyMatrix4(m),
+                    new THREE.Plane(new THREE.Vector3( 0,  1, 0), halfH).applyMatrix4(m),
+                    new THREE.Plane(new THREE.Vector3( 0, -1, 0), halfH).applyMatrix4(m)
+                ];
+            },
+            tick: function(time) {
+                const THREE = AFRAME.THREE;
+                const c = this.cfg;
+                const rawElapsed = (time - this.startTime) / 1000;
+                const dur = this.data.masterDuration;
+                const t = dur > 0 ? (rawElapsed % dur) : rawElapsed;
+
+                let px = this.evalKf('posX', c.p[0], t);
+                let py = this.evalKf('posY', c.p[1], t);
+                let pz = this.evalKf('posZ', c.p[2], t);
+                let sx = this.evalKf('scaleX', c.s[0], t);
+                let sy = this.evalKf('scaleY', c.s[1], t);
+                let sz = this.evalKf('scaleZ', c.s[2], t);
+                let rx = this.evalKf('rotX', c.r[0], t);
+                let ry = this.evalKf('rotY', c.r[1], t);
+                let rz = this.evalKf('rotZ', c.r[2], t);
+                let op = this.evalKf('opacity', c.op ?? 1.0, t);
+                let spd = this.evalKf('animSpeed', c.as ?? 1.0, t);
+                let amp = this.evalKf('animAmp', c.aa ?? 1.0, t);
+                let sim = this.evalKf('similarity', c.sim ?? 0.38, t);
+                let sm  = this.evalKf('smoothness', c.sm ?? 0.08, t);
+
+                if (c.ap && c.ap !== 'none') {
+                    const phase = t * spd * 2.2;
+                    if (c.ap === 'float') pz += Math.sin(phase) * 0.06 * amp;
+                    else if (c.ap === 'spinY') ry = (ry + t * 60 * spd) % 360;
+                    else if (c.ap === 'spinZ') rz = (rz + t * 60 * spd) % 360;
+                    else if (c.ap === 'pulse') {
+                        const f = 1 + Math.sin(phase * 1.5) * 0.12 * amp;
+                        sx *= f; sy *= f; sz *= f;
+                    } else if (c.ap === 'wiggle') {
+                        rz += Math.sin(phase * 2.5) * 8 * amp;
+                        rx += Math.cos(phase * 2.0) * 5 * amp;
+                    } else if (c.ap === 'fadeIn') {
+                        const d = dur > 0 ? dur : 3.0;
+                        op *= Math.min(1, (t * spd) / (d * 0.4));
+                    } else if (c.ap === 'fadeOut') {
+                        const d = dur > 0 ? dur : 3.0;
+                        op *= Math.max(0, 1 - (t * spd) / d);
+                    }
+                }
+
+                const obj = this.el.object3D;
+                obj.position.set(px, py, pz);
+                obj.scale.set(sx, sy, sz);
+                obj.rotation.set(
+                    THREE.MathUtils.degToRad(rx),
+                    THREE.MathUtils.degToRad(ry),
+                    THREE.MathUtils.degToRad(rz)
+                );
+
+                const planes = this.computeClipPlanes();
+                obj.traverse(child => {
+                    if (child.isMesh && child.material) {
+                        child.material.clippingPlanes = planes;
+                        child.material.transparent = true;
+                        if (child.material.uniforms && child.material.uniforms.opacity) {
+                            child.material.uniforms.opacity.value = op;
+                            child.material.uniforms.similarity.value = sim;
+                            child.material.uniforms.smoothness.value = sm;
+                            if (planes) {
+                                child.material.uniforms.useClip.value = 1.0;
+                                child.material.uniforms.clipP0.value.set(planes[0].normal.x, planes[0].normal.y, planes[0].normal.z, planes[0].constant);
+                                child.material.uniforms.clipP1.value.set(planes[1].normal.x, planes[1].normal.y, planes[1].normal.z, planes[1].constant);
+                                child.material.uniforms.clipP2.value.set(planes[2].normal.x, planes[2].normal.y, planes[2].normal.z, planes[2].constant);
+                                child.material.uniforms.clipP3.value.set(planes[3].normal.x, planes[3].normal.y, planes[3].normal.z, planes[3].constant);
+                            } else {
+                                child.material.uniforms.useClip.value = 0.0;
+                            }
+                        } else {
+                            child.material.opacity = op;
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh; position: relative; overflow: hidden; background: transparent !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
+        a-scene { position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; z-index: 1; }
+        .mindar-ui-overlay { z-index: 2 !important; }
+        #status { position: fixed; top: calc(16px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(12px); color: #00ff88; padding: 10px 20px; border-radius: 30px; font-size: 13px; font-weight: 600; z-index: 99999; pointer-events: none; text-align: center; border: 1px solid rgba(255,255,255,0.15); transition: opacity 0.3s ease; white-space: nowrap; }
+        #unmute-btn { position: fixed; bottom: calc(28px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: none; background: #ffffff; color: #111111; border: none; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 99999; cursor: pointer; box-shadow: 0 4px 25px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+
+    <div id="status">Initializing Nizhali V6...</div>
+    <button id="unmute-btn">🔇 Tap for Sound</button>
+
+    <script type="module">
+        import './mindar-image-aframe.prod.js';
+
+        const statusEl = document.getElementById('status');
+        const unmuteBtn = document.getElementById('unmute-btn');
+        let videoElements = [];
+        let isMuted = true;
+        let activeTargetFound = false;
+
+        function cleanStorageUrl(url) {
+            if (!url) return '';
+            let clean = url.trim();
+            if (clean.includes('dropbox.com')) {
+                clean = clean.replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+                             .replace('dropbox.com', 'dl.dropboxusercontent.com')
+                             .replace(/[?&]dl=[01]/g, '');
+            }
+            return clean;
+        }
+
+        async function bootV6() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                let mindUrl = '';
+                let targetAspect = 1.0;
+                let masterDuration = 0;
+                let masks = [];
+                let layers = [];
+
+                if (params.get('scene')) {
+                    const decoded = JSON.parse(decodeURIComponent(atob(params.get('scene'))));
+                    mindUrl = cleanStorageUrl(decoded.m);
+                    targetAspect = decoded.ta || 1.0;
+                    masterDuration = decoded.dur || 0;
+                    masks = decoded.masks || [];
+                    layers = decoded.l.map(item => ({
+                        ...item,
+                        u: cleanStorageUrl(item.u)
+                    }));
+                } else {
+                    mindUrl = cleanStorageUrl(params.get('mind'));
+                    const videoParam = params.get('video');
+                    if (videoParam) {
+                        layers = videoParam.split(',').map(vUrl => ({
+                            t: 'video',
+                            u: cleanStorageUrl(vUrl),
+                            p: [0,0,0], s: [1,1,1], r: [0,0,0],
+                            op: 1.0, cs: 'none', ap: 'none', as: 1, aa: 1, kf: {}
+                        }));
+                    }
+                }
+
+                if (!mindUrl || layers.length === 0) {
+                    statusEl.textContent = '❌ Missing ?scene= or ?mind= in URL';
+                    return;
+                }
+
+                statusEl.textContent = '1/2 Loading AR Target...';
+                const checkRes = await fetch(mindUrl);
+                if (!checkRes.ok) throw new Error(`Target file error (${checkRes.status})`);
+                const mindBuffer = await checkRes.arrayBuffer();
+                const localMindBlobUrl = URL.createObjectURL(new Blob([mindBuffer]));
+
+                statusEl.textContent = '2/2 Starting Camera...';
+
+                let assetsHtml = '';
+                let entitiesHtml = '';
+
+                // 1. Create Invisible Clip Mask Reference Nodes
+                masks.forEach(m => {
+                    entitiesHtml += `<a-entity id="mask-${m.id}" position="${m.p.join(' ')}" scale="${m.s.join(' ')}" rotation="${m.r.join(' ')}"></a-entity>`;
+                });
+
+                // 2. Create Media Layer Entities
+                layers.forEach((l, idx) => {
+                    const posStr = (l.p || [0,0,0]).join(' ');
+                    const scaleStr = (l.s || [1,1,1]).join(' ');
+                    const rotStr = (l.r || [0,0,0]).join(' ');
+                    const encodedCfg = encodeURIComponent(JSON.stringify(l));
+                    const compAttr = `nizhali-layer="configJson: ${encodedCfg}; targetAspect: ${targetAspect}; masterDuration: ${masterDuration}"`;
+
+                    if (l.t === 'video' || l.t === 'chroma') {
+                        assetsHtml += `<video id="vid-${idx}" src="${l.u}" preload="auto" loop muted playsinline webkit-playsinline crossorigin="anonymous"></video>`;
+                        const enableChroma = l.t === 'chroma' ? 1.0 : 0.0;
+                        entitiesHtml += `<a-plane id="ent-${idx}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr} width="1" height="1" material="shader: nizhali-surface; src: #vid-${idx}; color: ${l.c || '#00ff00'}; similarity: ${l.sim ?? 0.38}; smoothness: ${l.sm ?? 0.08}; enableChroma: ${enableChroma}; opacity: ${l.op ?? 1.0}; transparent: true; side: double"></a-plane>`;
+                    } else if (l.t === 'image') {
+                        assetsHtml += `<img id="img-${idx}" src="${l.u}" crossorigin="anonymous">`;
+                        entitiesHtml += `<a-plane id="ent-${idx}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr} width="1" height="1" material="shader: nizhali-surface; src: #img-${idx}; enableChroma: 0.0; opacity: ${l.op ?? 1.0}; transparent: true; side: double"></a-plane>`;
+                    } else if (l.t === 'glb') {
+                        entitiesHtml += `<a-gltf-model id="ent-${idx}" src="${l.u}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr}></a-gltf-model>`;
+                    }
+                });
+
+                window.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2.0);
+
+                const sceneWrapper = document.createElement('div');
+                sceneWrapper.style.width = '100%';
+                sceneWrapper.style.height = '100%';
+                sceneWrapper.innerHTML = `
+                    <a-scene
+                        id="ar-scene"
+                        mindar-image="imageTargetSrc: ${localMindBlobUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 10; filterBeta: 10000; warmupTolerance: 1; missTolerance: 5;"
+                        color-space="sRGB"
+                        renderer="colorManagement: true, physicallyCorrectLights: false, alpha: true, antialias: true, powerPreference: high-performance"
+                        vr-mode-ui="enabled: false"
+                        device-orientation-permission-ui="enabled: false"
+                        embedded>
+                        <a-assets timeout="10000">${assetsHtml}</a-assets>
+                        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+                        <a-entity id="target-root" mindar-image-target="targetIndex: 0">
+                            ${entitiesHtml}
+                        </a-entity>
+                    </a-scene>
+                `;
+
+                document.body.appendChild(sceneWrapper);
+
+                const sceneEl = document.getElementById('ar-scene');
+                const targetRoot = document.getElementById('target-root');
+
+                layers.forEach((l, idx) => {
+                    const ent = document.getElementById(`ent-${idx}`);
+                    if (l.t === 'video' || l.t === 'chroma') {
+                        const vid = document.getElementById(`vid-${idx}`);
+                        videoElements.push(vid);
+                        vid.addEventListener('loadedmetadata', () => {
+                            if (vid.videoWidth && vid.videoHeight) {
+                                ent.setAttribute('height', (vid.videoHeight / vid.videoWidth).toFixed(4));
+                            }
+                        });
+                    } else if (l.t === 'image') {
+                        const img = document.getElementById(`img-${idx}`);
+                        img.addEventListener('load', () => {
+                            if (img.naturalWidth && img.naturalHeight) {
+                                ent.setAttribute('height', (img.naturalHeight / img.naturalWidth).toFixed(4));
+                            }
+                        });
+                    }
+                });
+
+                targetRoot.addEventListener('targetFound', () => {
+                    activeTargetFound = true;
+                    statusEl.textContent = '🎯 Target Locked';
+                    setTimeout(() => { if (activeTargetFound) statusEl.style.opacity = '0'; }, 1500);
+                    videoElements.forEach(vid => {
+                        vid.muted = isMuted;
+                        vid.play().catch(() => {
+                            vid.muted = true;
+                            isMuted = true;
+                            vid.play();
+                        });
+                    });
+                    if (videoElements.length > 0) unmuteBtn.style.display = 'block';
+                });
+
+                targetRoot.addEventListener('targetLost', () => {
+                    activeTargetFound = false;
+                    statusEl.style.opacity = '1';
+                    statusEl.textContent = '📷 Scan Print';
+                    videoElements.forEach(vid => vid.pause());
+                });
+
+                sceneEl.addEventListener('arReady', () => {
+                    statusEl.textContent = '✅ AR Ready! Scan Print';
+                });
+
+            } catch (err) {
+                statusEl.textContent = '❌ ' + err.message;
+            }
+        }
+
+        function toggleAudio() {
+            isMuted = !isMuted;
+            videoElements.forEach(vid => {
+                vid.muted = isMuted;
+                if (!isMuted) vid.play();
+            });
+            unmuteBtn.textContent = isMuted ? '🔇 Tap for Sound' : '🔊 Sound On';
+        }
+
+        unmuteBtn.addEventListener('click', toggleAudio);
+        unmuteBtn.addEventListener('touchend', (e) => { e.preventDefault(); toggleAudio(); });
+        window.addEventListener('load', bootV6);
+    </script>
+</body>
+</html>

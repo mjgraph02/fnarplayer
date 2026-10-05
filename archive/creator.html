@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIZHALI V6 // FIELD AR WORKSTATION</title>
+
+    <!-- Modular Stylesheet -->
+    <link rel="stylesheet" href="./studio.css">
+
+    <!-- Three.js + OrbitControls + TransformControls + GLTFLoader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <!-- Local MindAR Compiler Engine -->
+    <script type="module" src="./mindar-image.prod.js"></script>
+</head>
+<body>
+
+    <!-- 1. TOP HARDWARE BAR: PROJECT MANAGER & MULTI-TARGET SWITCHER -->
+    <header id="top-hardware-bar">
+        <div class="brand-cluster">
+            <div class="led-dot"></div>
+            <span class="brand-name">NIZHALI // OP-V6</span>
+            <span class="spec-tag">FIELD STUDIO</span>
+        </div>
+
+        <!-- Multi-Target Tabs (Switch between multiple images/toys/face filters inside 1 Client Project!) -->
+        <div id="target-tabs-bar"></div>
+
+        <div class="project-actions">
+            <button class="btn btn-sm" onclick="addNewTargetSlot('image')" title="Add Flat Print Target">+ 🖼️ Print</button>
+            <button class="btn btn-sm" onclick="addNewTargetSlot('toy3d')" title="Add 3D Toy .glb Scan Target">+ 🧸 3D Toy</button>
+            <button class="btn btn-sm" onclick="addNewTargetSlot('face')" title="Add Face Filter Target">+ 👤 Face AR</button>
+            <button class="btn btn-sm" onclick="loadProjectJsonFile()">📂 Load JSON</button>
+            <input type="file" id="projectJsonInput" accept=".json" style="display:none" onchange="handleProjectJsonUpload(event)">
+            <button class="btn btn-sm btn-green" onclick="saveProjectJsonFile()">💾 Save project.json</button>
+            <button class="btn btn-sm" onclick="toggleStudioTheme()" title="Switch Dark Studio / Light Field Chassis">🌗 Chassis</button>
+        </div>
+    </header>
+
+    <!-- 2. LEFT PANEL: ACTIVE TARGET CONFIG, COMPILER & SCENE HIERARCHY -->
+    <aside class="panel">
+        <div class="module-header">
+            <span>MOD-01 // TARGET TRACKER</span>
+            <span id="activeTargetBadge" class="spec-tag">PRINT</span>
+        </div>
+
+        <!-- Target Configuration Box (Adapts dynamically to Print, 3D Toy .glb, or Face AR!) -->
+        <div class="hw-card">
+            <label>Target Slot Name</label>
+            <input type="text" id="targetSlotName" oninput="renameActiveTarget(this.value)">
+
+            <!-- A: FLAT PRINT TARGET CONTROLS -->
+            <div id="targetModePrintBox">
+                <label>Upload Target Image OR Paste Dropbox Link</label>
+                <input type="file" id="targetImgInput" accept="image/*" style="font-size:10px; width:100%; margin-bottom:4px;">
+                <input type="text" id="targetImgUrlInput" placeholder="https://www.dropbox.com/.../print.jpg" oninput="loadTargetFromUrl()">
+            </div>
+
+            <!-- B: 3D TOY PHOTOGRAMMETRY (.GLB) TARGET CONTROLS (Zoro Use Case!) -->
+            <div id="targetModeToyBox" style="display:none;">
+                <label style="color:var(--te-yellow);">Upload 3D Toy Scan (.glb) OR Paste Link</label>
+                <input type="file" id="toyGlbInput" accept=".glb,.gltf" style="font-size:10px; width:100%; margin-bottom:4px;" onchange="loadToyTargetGlbFile(event)">
+                <input type="text" id="toyGlbUrlInput" placeholder="https://www.dropbox.com/.../zoro_scan.glb" oninput="loadToyTargetGlbUrl()">
+                <label class="toggle-row" style="margin-top:6px;">
+                    <span>👻 Use Toy .glb as 3D Phantom Occluder</span>
+                    <input type="checkbox" id="toyOccluderToggle" checked onchange="syncToyOccluder()">
+                </label>
+                <small style="font-size:10px; color:var(--text-muted); display:block;">
+                    Hides 3D swords/effects behind the real physical toy in AR, and auto-captures multi-angle PnP views when compiling!
+                </small>
+            </div>
+
+            <!-- C: FACE TRACKING CONTROLS (Jewelry, Glasses, Makeup) -->
+            <div id="targetModeFaceBox" style="display:none;">
+                <label style="color:var(--te-cyan);">Face AR Anchor Point for Selected Layer</label>
+                <select id="faceAnchorSelect" onchange="syncFaceAnchor()">
+                    <option value="168">🕶️ Nose Bridge (Glasses / Shades)</option>
+                    <option value="10">👑 Forehead / Head Top (Hats / Bindis)</option>
+                    <option value="234">💎 Left Ear (Jhumka / Earring L)</option>
+                    <option value="454">💎 Right Ear (Jhumka / Earring R)</option>
+                    <option value="152">📿 Chin / Neck (Necklaces / Chokers)</option>
+                    <option value="1">👄 Nose Tip / Mouth Area</option>
+                </select>
+                <label class="toggle-row" style="margin-top:6px;">
+                    <span>👻 Enable 3D Head Depth Occluder</span>
+                    <input type="checkbox" id="faceOccluderToggle" checked onchange="syncFaceOccluder()">
+                </label>
+            </div>
+
+            <!-- Built-in Multi-Target & 3D Toy Turntable .mind Compiler -->
+            <button class="btn btn-orange" id="compileMindBtn" style="margin-top:8px;" onclick="compileProjectMindFile()">
+                ⚙️ Compile Project targets.mind
+            </button>
+            <div class="progress-wrap" id="compileProgressWrap">
+                <div class="progress-bar" id="compileProgressBar"></div>
+            </div>
+            <div id="compileStatusText" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--te-green); margin-top:4px; display:none;"></div>
+
+            <label style="margin-top:8px;">Dropbox Compiled .mind Link (Shared by Project)</label>
+            <input type="text" id="mindUrlInput" placeholder="Paste Dropbox link of targets.mind" oninput="syncProjectMindUrl(this.value)">
+        </div>
+
+        <div class="module-header">
+            <span>MOD-02 // ADD LAYERS & MASKS</span>
+        </div>
+        <button class="btn btn-green" onclick="addMediaLayer()">
+            ➕ Add Media Layer (.mp4 / .png / .glb)
+        </button>
+        <button class="btn btn-cyan" onclick="addClipMaskPlane()">
+            ✂️ + Add Clip Mask Plane (Portal Window)
+        </button>
+        <div class="row-2">
+            <button class="btn" onclick="groupSelectedLayers()">📁 Group (Ctrl+G)</button>
+            <button class="btn" onclick="ungroupSelectedFolder()">📂 Ungroup</button>
+        </div>
+
+        <div class="module-header">
+            <span>MOD-03 // SCENE HIERARCHY</span>
+            <small>Ctrl/Shift</small>
+        </div>
+        <div id="layerList"></div>
+    </aside>
+
+    <!-- 3. CENTER PANEL: 3D WORKSTATION VIEWPORT -->
+    <main id="viewport-container">
+        <div class="floating-deck">
+            <button class="deck-btn" id="btn-undo" onclick="undo()" disabled>↩ UNDO</button>
+            <button class="deck-btn" id="btn-redo" onclick="redo()" disabled>↪ REDO</button>
+            <button class="deck-btn active" id="gizmo-translate" onclick="setGizmoMode('translate')">✥ MOVE (W)</button>
+            <button class="deck-btn" id="gizmo-rotate" onclick="setGizmoMode('rotate')">↻ ROT (E)</button>
+            <button class="deck-btn" id="gizmo-scale" onclick="setGizmoMode('scale')">⤢ SCALE (R)</button>
+            <button class="deck-btn" onclick="focusSelectedLayer()">🎯 FOCUS (F)</button>
+            <button class="deck-btn" onclick="setCameraPreset('front')">2D FRONT</button>
+            <button class="deck-btn" onclick="setCameraPreset('perspective')">3D ORBIT</button>
+            <button class="deck-btn" onclick="setCameraPreset('side')">Z-SIDE</button>
+        </div>
+
+        <div id="toast" class="status-toast"></div>
+
+        <div class="viewport-footer">
+            [SPACE + DRAG] PAN  //  [CLICK] SELECT  //  [◆] KEYFRAME  //  [F] FIND OBJECT
+        </div>
+
+        <canvas id="webgl-canvas"></canvas>
+    </main>
+
+    <!-- 4. RIGHT PANEL: PARAMETER INSPECTOR & PROJECT LINK GENERATOR -->
+    <aside class="panel panel-right">
+        <div class="module-header">
+            <span>MOD-04 // PARAMETER INSPECTOR</span>
+            <button class="mini-btn" id="inspectorFocusBtn" style="display:none;" onclick="focusSelectedLayer()">🎯 FIND</button>
+        </div>
+
+        <div id="inspectorEmpty" class="hw-card" style="color:var(--text-muted); font-size:11px; line-height:1.5;">
+            Select or add a layer to configure 3D transforms, Chroma Key, Portal Clipping Masks, and Keyframe automation.
+        </div>
+
+        <div id="inspectorControls" style="display:none;">
+            <div class="hw-card">
+                <label>Layer Name</label>
+                <input type="text" id="inpName" oninput="syncUIFromInspector()" onchange="saveHistoryState()">
+
+                <div id="maskPlaneCard" style="display:none; margin-top:6px;">
+                    <label class="toggle-row">
+                        <span>👁️ Show Helper Frame in Studio</span>
+                        <input type="checkbox" id="maskGuideToggle" checked onchange="syncMaskPlaneGuide()">
+                    </label>
+                </div>
+
+                <div id="mediaSourceCard" style="margin-top:6px;">
+                    <label>Dropbox Media Link (.mp4 / .png / .glb)</label>
+                    <input type="text" id="inpUrl" placeholder="Paste Dropbox link..." oninput="handleDropboxUrl()">
+                    <label>Or Local File Preview</label>
+                    <input type="file" id="inpLocalFile" accept="video/*,image/*,.glb,.gltf" style="font-size:10px; width:100%;" onchange="handleLocalFile(event)">
+                    <div id="glbClipRow" style="display:none; margin-top:6px;">
+                        <label>3D .glb Animation Clip</label>
+                        <select id="glbClipSelect" onchange="changeGlbClip()"></select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TRANSFORMS -->
+            <div class="hw-card">
+                <div class="module-header" style="margin-top:0;">
+                    <span>3D COORDINATES</span>
+                    <button class="kf-btn" onclick="addKeyframeForGroup('transform')">◆ KEY ALL</button>
+                </div>
+                <div class="row-3">
+                    <div><label><span>POS X</span><button class="kf-btn" id="kf-posX" onclick="toggleParamKeyframe('posX')">◆</button></label><input type="number" id="posX" step="0.02" value="0" oninput="onParamEdit('posX')"></div>
+                    <div><label><span>POS Y</span><button class="kf-btn" id="kf-posY" onclick="toggleParamKeyframe('posY')">◆</button></label><input type="number" id="posY" step="0.02" value="0" oninput="onParamEdit('posY')"></div>
+                    <div><label><span>POS Z</span><button class="kf-btn" id="kf-posZ" onclick="toggleParamKeyframe('posZ')">◆</button></label><input type="number" id="posZ" step="0.02" value="0" oninput="onParamEdit('posZ')"></div>
+                </div>
+                <div class="row-3" style="margin-top:4px;">
+                    <div><label><span>SCL X</span><button class="kf-btn" id="kf-scaleX" onclick="toggleParamKeyframe('scaleX')">◆</button></label><input type="number" id="scaleX" step="0.05" value="1" oninput="onParamEdit('scaleX')"></div>
+                    <div><label><span>SCL Y</span><button class="kf-btn" id="kf-scaleY" onclick="toggleParamKeyframe('scaleY')">◆</button></label><input type="number" id="scaleY" step="0.05" value="1" oninput="onParamEdit('scaleY')"></div>
+                    <div><label><span>SCL Z</span><button class="kf-btn" id="kf-scaleZ" onclick="toggleParamKeyframe('scaleZ')">◆</button></label><input type="number" id="scaleZ" step="0.05" value="1" oninput="onParamEdit('scaleZ')"></div>
+                </div>
+                <div class="row-3" style="margin-top:4px;">
+                    <div><label><span>ROT X</span><button class="kf-btn" id="kf-rotX" onclick="toggleParamKeyframe('rotX')">◆</button></label><input type="number" id="rotX" step="5" value="0" oninput="onParamEdit('rotX')"></div>
+                    <div><label><span>ROT Y</span><button class="kf-btn" id="kf-rotY" onclick="toggleParamKeyframe('rotY')">◆</button></label><input type="number" id="rotY" step="5" value="0" oninput="onParamEdit('rotY')"></div>
+                    <div><label><span>ROT Z</span><button class="kf-btn" id="kf-rotZ" onclick="toggleParamKeyframe('rotZ')">◆</button></label><input type="number" id="rotZ" step="5" value="0" oninput="onParamEdit('rotZ')"></div>
+                </div>
+            </div>
+
+            <!-- OPACITY, CLIP MASK & EFFECTS -->
+            <div id="appearanceCard" class="hw-card">
+                <label>
+                    <span>💧 OPACITY (<span id="opacityVal">1.00</span>)</span>
+                    <button class="kf-btn" id="kf-opacity" onclick="toggleParamKeyframe('opacity')">◆</button>
+                </label>
+                <input type="range" id="inpOpacity" min="0" max="1" step="0.02" value="1" oninput="onParamEdit('opacity')">
+
+                <label style="margin-top:8px;">✂️ PORTAL / CLIP MASK SOURCE (+Z & -Z)</label>
+                <select id="clipSourceSelect" onchange="syncEffectsFromInputs(); saveHistoryState();">
+                    <option value="none">None (Unclipped)</option>
+                    <option value="target">🕳️ Target Frame Bounds</option>
+                </select>
+            </div>
+
+            <div id="effectsCard" class="hw-card">
+                <label>✨ PRESET LOOP ANIMATION</label>
+                <select id="animPreset" onchange="syncEffectsFromInputs(); updateMasterDuration(); saveHistoryState();">
+                    <option value="none">None</option>
+                    <option value="float">🎈 Float (Bobbing)</option>
+                    <option value="spinY">🔄 Spin 360° (Y)</option>
+                    <option value="spinZ">🎡 Spin 360° (Z)</option>
+                    <option value="pulse">💓 Pulse Scale</option>
+                    <option value="wiggle">〰️ Wiggle Tilt</option>
+                    <option value="fadeIn">🌅 Fade In</option>
+                    <option value="fadeOut">🌇 Fade Out</option>
+                </select>
+
+                <div id="animParamsBox" style="display:none; margin-top:6px;">
+                    <div class="row-2">
+                        <div>
+                            <label><span>SPD (<span id="animSpeedVal">1.0</span>)</span><button class="kf-btn" id="kf-animSpeed" onclick="toggleParamKeyframe('animSpeed')">◆</button></label>
+                            <input type="range" id="animSpeed" min="0.1" max="4.0" step="0.1" value="1.0" oninput="onParamEdit('animSpeed')">
+                        </div>
+                        <div>
+                            <label><span>AMP (<span id="animAmpVal">1.0</span>)</span><button class="kf-btn" id="kf-animAmp" onclick="toggleParamKeyframe('animAmp')">◆</button></label>
+                            <input type="range" id="animAmp" min="0.1" max="3.0" step="0.1" value="1.0" oninput="onParamEdit('animAmp')">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="chromaEffectSection" style="border-top:1.5px solid var(--line-subtle); margin-top:8px; padding-top:6px;">
+                    <label class="toggle-row">
+                        <span>🟩 CHROMA KEY GREEN/BLUE</span>
+                        <input type="checkbox" id="chromaToggle" onchange="syncEffectsFromInputs(); saveHistoryState();">
+                    </label>
+                    <div id="chromaParamsBox" style="display:none; margin-top:4px;">
+                        <input type="color" id="chromaColor" value="#00ff00" style="width:100%; height:24px;" oninput="syncEffectsFromInputs()">
+                        <label><span>CUTOFF (<span id="simVal">0.38</span>)</span><button class="kf-btn" id="kf-similarity" onclick="toggleParamKeyframe('similarity')">◆</button></label>
+                        <input type="range" id="chromaSim" min="0.05" max="0.8" step="0.01" value="0.38" oninput="onParamEdit('similarity')">
+                        <label><span>SMOOTH (<span id="smoothVal">0.08</span>)</span><button class="kf-btn" id="kf-smoothness" onclick="toggleParamKeyframe('smoothness')">◆</button></label>
+                        <input type="range" id="chromaSmooth" min="0.01" max="0.3" step="0.01" value="0.08" oninput="onParamEdit('smoothness')">
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-danger" onclick="deleteSelectedLayers()">🗑️ DELETE SELECTED LAYER</button>
+        </div>
+
+        <!-- PERMANENT CLIENT PROJECT LINK BOX -->
+        <div class="hw-card" style="margin-top:auto;">
+            <label>Dropbox project.json Link (For Permanent Client QR)</label>
+            <input type="text" id="projectJsonUrlInput" placeholder="Paste Dropbox project.json link (Optional)">
+            <button class="btn btn-orange" style="margin-top:6px; margin-bottom:0;" onclick="exportProject()">⚡ GET PERMANENT V6 LINK</button>
+            <div id="export-box"></div>
+        </div>
+    </aside>
+
+    <!-- 5. BOTTOM TAPE-DECK TIMELINE DOCK -->
+    <footer id="timeline-dock">
+        <div class="timeline-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <button class="btn btn-sm" id="masterPlayBtn" onclick="toggleMasterPlay()">⏸ PAUSE</button>
+                <button class="btn btn-sm" onclick="scrubMasterTimeline(0)">⏮ 0.0s</button>
+                <button class="btn btn-sm" id="autoKeyBtn" onclick="toggleAutoKey()">🔴 AUTO-KEY: OFF</button>
+                <div class="time-lcd" id="masterTimeDisplay">00.00s / 00.00s [STATIC]</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="spec-tag" id="durationModeBadge">STATIC 0s</span>
+                <label style="margin:0;">LOOP SEC:</label>
+                <input type="number" id="customDurationInput" value="5" min="1" max="120" step="0.5" style="width:60px;" onchange="updateMasterDuration()">
+            </div>
+        </div>
+        <input type="range" id="masterTimelineScrubber" min="0" max="5" step="0.01" value="0" oninput="scrubMasterTimeline(this.value)">
+        <div id="keyframeTrack" title="Click diamond to jump, Right-Click diamond to delete"></div>
+    </footer>
+
+    <!-- Modular Core 3D Engine -->
+    <script src="./studio-engine.js"></script>
+</body>
+</html>
