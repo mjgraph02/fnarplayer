@@ -1,274 +1,303 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NIZHALI V7 // CREATOR STUDIO WORKSTATION</title>
-  <link rel="stylesheet" href="./studio.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nizhali V7 Studio — Pro Keyframe, 3D Toy & Mask Engine</title>
+
+    <!-- Three.js + OrbitControls + TransformControls + GLTFLoader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <!-- Vendor Libraries from /vendor/ -->
+    <script src="./vendor/crypto-js.min.js"></script>
+    <script type="module" src="./vendor/mindar-image.prod.js"></script>
+
+    <!-- Studio Stylesheet -->
+    <link rel="stylesheet" href="./studio.css">
 </head>
 <body>
-  <div class="workstation-shell">
-    <!-- TOP HARDWARE BAR -->
-    <header class="topbar">
-      <div class="brand-badge">
-        <span class="brand-led"></span>
-        <span>NIZHALI V7 // STUDIO WORKSTATION</span>
-        <span class="status-badge" id="project-status">LOCAL READY</span>
-      </div>
 
-      <div class="mode-switch-group" id="tracking-mode-tabs">
-        <button class="hw-btn active" data-mode="print">01 PRINT (.MIND)</button>
-        <button class="hw-btn" data-mode="toy3d">02 3D TOY (EPnP SCAN)</button>
-        <button class="hw-btn" data-mode="face">03 FACE AR (MESH)</button>
-      </div>
+    <!-- 1. LEFT PANEL: TRACKING MODE, TARGET COMPILER, MEDIA / MASK PLANE & HIERARCHY -->
+    <div class="panel">
+        <div class="brand-header">
+            <span class="brand-title">NIZHALI V7 // STUDIO</span>
+            <span class="badge">OP-FIELD REV.7</span>
+        </div>
 
-      <div style="display:flex; gap:6px;">
-        <button class="hw-btn" id="btn-undo" title="Ctrl+Z">UNDO</button>
-        <button class="hw-btn" id="btn-redo" title="Ctrl+Y">REDO</button>
-        <button class="hw-btn accent-yellow" id="btn-compile-mind">COMPILE .MIND</button>
-        <button class="hw-btn accent-green" id="btn-export-project">SYNC DROPBOX</button>
-      </div>
-    </header>
+        <h3>01 // TRACKING ENGINE MODE</h3>
+        <div class="mode-tabs">
+            <button class="mode-tab-btn active" id="mode-btn-print" onclick="setTrackingMode('print')">01 PRINT</button>
+            <button class="mode-tab-btn" id="mode-btn-toy" onclick="setTrackingMode('toy')">02 3D TOY</button>
+            <button class="mode-tab-btn" id="mode-btn-face" onclick="setTrackingMode('face')">03 FACE AR</button>
+        </div>
 
-    <!-- LEFT PANEL: MULTI-TARGET MANAGER & SCENE HIERARCHY -->
-    <aside class="panel-left">
-      <div class="section-header">
-        <span>TARGETS & ANCHORS</span>
-        <button class="hw-btn" id="btn-add-target">+ TARGET</button>
-      </div>
-      <div class="panel-body" style="max-height: 170px; border-bottom: var(--border-hard);">
-        <ul class="layer-tree" id="target-list">
-          <li class="layer-item selected" data-target-id="target-0">
-            <span>[00] MAIN_PRINT_TARGET</span>
-            <span class="status-badge">LOCKED</span>
-          </li>
-        </ul>
-      </div>
+        <!-- MODE A: PRINT TARGET & .MIND COMPILER -->
+        <div class="step-card" id="card-mode-print">
+            <label>Upload Target Photo OR Paste Dropbox Image Link</label>
+            <input type="file" id="targetImgInput" accept="image/*" style="font-size:10px; width:100%; margin-bottom:4px;">
+            <input type="text" id="targetImgUrlInput" placeholder="https://www.dropbox.com/.../target.jpg" oninput="loadTargetFromUrl()">
 
-      <div class="section-header">
-        <span>SCENE HIERARCHY</span>
-        <div style="display:flex; gap:4px;">
-          <button class="hw-btn" id="btn-add-folder" title="Ctrl+G">+ GRP</button>
-          <button class="hw-btn" id="btn-add-layer">+ LAYER</button>
-        </div>
-      </div>
-      <div class="panel-body">
-        <ul class="layer-tree" id="layer-tree">
-          <li class="layer-item folder-group" data-layer-id="grp-portal">
-            <span>[DIR] PORTAL_GROUP</span>
-            <span>V</span>
-          </li>
-          <li class="layer-item layer-child-indent selected" data-layer-id="lyr-hero-vid">
-            <span>01_HERO_VIDEO.MP4</span>
-            <span>VIS</span>
-          </li>
-          <li class="layer-item layer-child-indent" data-layer-id="lyr-fg-mesh">
-            <span>02_FG_MODEL.GLB</span>
-            <span>VIS</span>
-          </li>
-        </ul>
-      </div>
-    </aside>
+            <button class="btn btn-compile" id="compileMindBtn" onclick="compileMindInBrowser()">
+                ⚙️ Compile & Download .mind File
+            </button>
+            <div class="progress-wrap" id="compileProgressWrap">
+                <div class="progress-bar" id="compileProgressBar"></div>
+            </div>
+            <div id="compileStatusText" style="font-size:10px; color:#00d66c; margin-top:4px; display:none;"></div>
 
-    <!-- CENTER 3D VIEWPORT: V6 MULTI-TIER SLATE GRID & RETICLE -->
-    <main class="viewport-container" id="viewport-container">
-      <div class="viewport-axis-x"></div>
-      <div class="viewport-axis-y"></div>
+            <label style="margin-top:6px; color:#ffb800;">Dropbox Compiled .mind Link</label>
+            <input type="text" id="mindUrlInput" placeholder="Paste Dropbox link of compiled .mind file">
+        </div>
 
-      <div class="target-frame-guide" id="target-frame-guide">
-        <span class="target-frame-label">TARGET_00 // 16:9 ACTIVE FRAME [PORTAL MASK READY]</span>
-      </div>
+        <!-- MODE B: 3D TOY SURFACE SCANNER (.GLB EPnP + Optical Flow) -->
+        <div class="step-card" id="card-mode-toy" style="display:none;">
+            <label style="color:#ffb800;">Upload Reference 3D Toy (.glb) OR Paste Dropbox Link</label>
+            <input type="file" id="toyGlbInput" accept=".glb,.gltf" style="font-size:10px; width:100%; margin-bottom:4px;" onchange="loadToyReferenceFile(event)">
+            <input type="text" id="toyGlbUrlInput" placeholder="https://www.dropbox.com/.../toy.glb" oninput="loadToyReferenceUrl()">
+            <button class="btn btn-compile" onclick="scanToyPointCloud()">
+                💠 Extract 3D Surface Feature Cloud (EPnP)
+            </button>
+            <div id="toyScanStatus" style="font-size:10px; color:#00e5ff; margin-top:4px; font-family:monospace;">
+                READY: Load .glb toy to preview 3D anchor points
+            </div>
+        </div>
 
-      <div class="viewport-hud">
-        <div class="hud-pill">
-          <span>CAM: PERSPECTIVE</span>
-          <span>|</span>
-          <span id="hud-mode-readout">MODE: PRINT TRACKING</span>
-          <span>|</span>
-          <span id="hud-fps">60 FPS</span>
+        <!-- MODE C: FACE AR HEAD TRACKER -->
+        <div class="step-card" id="card-mode-face" style="display:none;">
+            <label style="color:#00e5ff;">Face Anchor Point</label>
+            <select id="faceAnchorSelect" onchange="updateFaceAnchorGuide()">
+                <option value="168">Nose Bridge / Glasses (Anchor 168)</option>
+                <option value="10">Forehead / Crown / Hat (Anchor 10)</option>
+                <option value="1">Nose Tip (Anchor 1)</option>
+                <option value="152">Chin / Mask (Anchor 152)</option>
+            </select>
+            <small style="color:#9c9b94; font-size:10px; display:block; margin-top:4px;">
+                3D Head Mannequin shown at (0,0,0) in viewport for accurate placement.
+            </small>
         </div>
-        <div class="hud-pill">
-          <span>[SPACE] PAN</span>
-          <span>[F] FOCUS</span>
-          <span>[CTRL+G] GROUP</span>
-        </div>
-      </div>
 
-      <canvas id="studio-canvas"></canvas>
+        <h3>02 // ADD OBJECTS, MASKS & FOLDERS</h3>
+        <button class="btn btn-primary" onclick="addMediaLayer()">
+            ➕ Add Media Layer (.mp4 / .png / .glb)
+        </button>
+        <button class="btn btn-mask" onclick="addClipMaskPlane()">
+            ✂️ + Add Clip Mask Plane (Invisible Portal Window)
+        </button>
+        <div class="row-2">
+            <button class="btn" onclick="groupSelectedLayers()" title="Shortcut: Ctrl+G">📁 Group (Ctrl+G)</button>
+            <button class="btn" onclick="ungroupSelectedFolder()">📂 Ungroup</button>
+        </div>
 
-      <!-- 3D TOY SCANNER OVERLAY -->
-      <div class="scanner-overlay" id="scanner-overlay">
-        <div style="font-weight:700; color:var(--te-orange); margin-bottom:4px;">
-          3D TOY SURFACE SCANNER (EPnP + OPTICAL FLOW)
+        <h3>
+            <span>03 // SCENE HIERARCHY</span>
+            <small style="color:#888; font-weight:normal; text-transform:none;">Ctrl/Shift + Click</small>
+        </h3>
+        <div id="layerList">
+            <div style="color:#666; font-size:11px; padding:6px 0;">No layers added yet.</div>
         </div>
-        <div style="font-size:10px; margin-bottom:6px;" id="scanner-status">
-          Load a .GLB reference model to extract 3D surface feature descriptors.
-        </div>
-        <div style="display:flex; gap:6px;">
-          <button class="hw-btn accent-yellow" id="btn-scan-glb">EXTRACT POINT CLOUD</button>
-          <button class="hw-btn" id="btn-test-flow">TEST OPTICAL LOCK</button>
-        </div>
-      </div>
+    </div>
 
-      <!-- GIZMO TOOLBAR -->
-      <div class="gizmo-toolbar">
-        <button class="hw-btn active" data-gizmo="translate" title="W">MOVE</button>
-        <button class="hw-btn" data-gizmo="rotate" title="E">ROTATE</button>
-        <button class="hw-btn" data-gizmo="scale" title="R">SCALE</button>
-        <button class="hw-btn" id="btn-reset-cam" title="F">CENTER</button>
-      </div>
-    </main>
+    <!-- 2. CENTER PANEL: REAL V6 THREE.JS 3D STAGE VIEWPORT -->
+    <div id="viewport-container">
+        <div class="top-toolbar">
+            <div class="tool-group">
+                <button class="tool-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
+                <button class="tool-btn" id="btn-redo" onclick="redo()" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
+            </div>
+            <div class="tool-divider"></div>
+            <div class="tool-group">
+                <button class="tool-btn active" id="gizmo-translate" onclick="setGizmoMode('translate')" title="Move (W)">✥ Move (W)</button>
+                <button class="tool-btn" id="gizmo-rotate" onclick="setGizmoMode('rotate')" title="Rotate (E)">↻ Rotate (E)</button>
+                <button class="tool-btn" id="gizmo-scale" onclick="setGizmoMode('scale')" title="Scale (R)">⤢ Scale (R)</button>
+            </div>
+            <div class="tool-divider"></div>
+            <div class="tool-group">
+                <button class="tool-btn highlight" onclick="focusSelectedLayer()" title="Focus Selected (F)">🎯 Focus (F)</button>
+            </div>
+            <div class="tool-divider"></div>
+            <div class="tool-group">
+                <button class="tool-btn" onclick="setCameraPreset('front')">Front</button>
+                <button class="tool-btn" onclick="setCameraPreset('perspective')">3D Orbit</button>
+                <button class="tool-btn" onclick="setCameraPreset('side')">Side (Z)</button>
+                <button class="tool-btn" onclick="setCameraPreset('top')">Top</button>
+            </div>
+        </div>
 
-    <!-- BOTTOM DOCK: MASTER KEYFRAME TIMELINE -->
-    <section class="timeline-dock">
-      <div class="timeline-toolbar">
-        <div style="display:flex; gap:6px; align-items:center;">
-          <button class="hw-btn" id="btn-tl-play">PLAY</button>
-          <button class="hw-btn" id="btn-tl-stop">STOP</button>
-          <button class="hw-btn accent-yellow" id="btn-add-keyframe">+ KEYFRAME (K)</button>
-          <span class="timecode-readout" id="timecode-display">00:00:00:00</span>
-        </div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <span>DURATION (S):</span>
-          <input type="number" class="hw-input" id="tl-duration" value="10" style="width:55px;">
-          <span>LOOP:</span>
-          <input type="checkbox" id="tl-loop" checked>
-        </div>
-      </div>
+        <div id="toast" class="status-toast"></div>
 
-      <div class="timeline-tracks" id="timeline-tracks">
-        <div class="playhead-line" id="playhead-line"></div>
-        <div class="track-row" data-track="position">
-          <div class="track-label">POSITION (X/Y/Z)</div>
-          <div class="track-lane" id="lane-position">
-            <div class="keyframe-diamond active" style="left: 10%;" data-time="1.0"></div>
-            <div class="keyframe-diamond" style="left: 50%;" data-time="5.0"></div>
-          </div>
+        <div class="viewport-footer">
+            🖐️ <b>Spacebar + Drag:</b> Pan | <b>Ctrl/Shift + Click:</b> Multi-Select | <b>◆ Diamond:</b> Add Keyframe | <b>F:</b> Focus
         </div>
-        <div class="track-row" data-track="rotation">
-          <div class="track-label">ROTATION (EULER)</div>
-          <div class="track-lane" id="lane-rotation">
-            <div class="keyframe-diamond" style="left: 25%;" data-time="2.5"></div>
-          </div>
-        </div>
-        <div class="track-row" data-track="scale">
-          <div class="track-label">SCALE (UNIFORM)</div>
-          <div class="track-lane" id="lane-scale"></div>
-        </div>
-        <div class="track-row" data-track="opacity">
-          <div class="track-label">OPACITY / FX</div>
-          <div class="track-lane" id="lane-opacity">
-            <div class="keyframe-diamond" style="left: 0%;" data-time="0.0"></div>
-            <div class="keyframe-diamond" style="left: 90%;" data-time="9.0"></div>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- RIGHT PANEL: INSPECTOR, PORTAL CLIPPING, CHROMA & AES-256 VAULT -->
-    <aside class="panel-right">
-      <div class="section-header">
-        <span>TRANSFORM INSPECTOR</span>
-        <span id="selected-layer-id">01_HERO_VIDEO</span>
-      </div>
-      <div class="prop-group">
-        <div class="prop-row">
-          <span class="prop-label">POS (XYZ)</span>
-          <div class="xyz-inputs">
-            <input type="number" step="0.1" class="hw-input" id="inp-pos-x" value="0.0">
-            <input type="number" step="0.1" class="hw-input" id="inp-pos-y" value="0.0">
-            <input type="number" step="0.1" class="hw-input" id="inp-pos-z" value="0.0">
-          </div>
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">ROT (XYZ)</span>
-          <div class="xyz-inputs">
-            <input type="number" step="1" class="hw-input" id="inp-rot-x" value="0">
-            <input type="number" step="1" class="hw-input" id="inp-rot-y" value="0">
-            <input type="number" step="1" class="hw-input" id="inp-rot-z" value="0">
-          </div>
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">SCALE</span>
-          <div class="xyz-inputs">
-            <input type="number" step="0.1" class="hw-input" id="inp-scl-x" value="1.0">
-            <input type="number" step="0.1" class="hw-input" id="inp-scl-y" value="1.0">
-            <input type="number" step="0.1" class="hw-input" id="inp-scl-z" value="1.0">
-          </div>
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">OPACITY</span>
-          <input type="range" min="0" max="1" step="0.01" id="inp-opacity" value="1">
-        </div>
-      </div>
+        <canvas id="webgl-canvas"></canvas>
+    </div>
 
-      <div class="section-header">
-        <span>4-PLANE 3D PORTAL & CHROMA</span>
-      </div>
-      <div class="prop-group">
-        <div class="prop-row">
-          <span class="prop-label">PORTAL MASK</span>
-          <select class="hw-select" id="sel-portal-mode">
-            <option value="none">DISABLED (STANDARD)</option>
-            <option value="inner">INNER PORTAL (DEEP BOX)</option>
-            <option value="frame">4-PLANE TARGET CLIP</option>
-          </select>
+    <!-- 3. RIGHT PANEL: INSPECTOR (WITH KEYFRAME DIAMONDS, CLIP MASKS & AES VAULT) -->
+    <div class="panel panel-right">
+        <div class="brand-header">
+            <span class="brand-title">INSPECTOR // PARAM</span>
+            <button class="layer-focus-btn" id="inspectorFocusBtn" style="display:none;" onclick="focusSelectedLayer()">🎯 Find (F)</button>
         </div>
-        <div class="prop-row">
-          <span class="prop-label">DEPTH Z</span>
-          <input type="number" step="0.05" class="hw-input" id="inp-portal-depth" value="-0.5">
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">CHROMA KEY</span>
-          <select class="hw-select" id="sel-chroma-mode">
-            <option value="off">OFF</option>
-            <option value="green">GREEN SCREEN (#00FF00)</option>
-            <option value="blue">BLUE SCREEN (#0000FF)</option>
-          </select>
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">THRESHOLD</span>
-          <input type="range" min="0" max="1" step="0.01" id="inp-chroma-thresh" value="0.35">
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">LOOP PRESET</span>
-          <select class="hw-select" id="sel-loop-preset">
-            <option value="none">NONE</option>
-            <option value="float">HOVER FLOAT</option>
-            <option value="turntable">360 TURNTABLE</option>
-            <option value="pulse">SCALE PULSE</option>
-          </select>
-        </div>
-      </div>
 
-      <div class="section-header">
-        <span>AES-256 DROPBOX CLOUD VAULT</span>
-      </div>
-      <div class="prop-group">
-        <div class="prop-row">
-          <span class="prop-label">ASSET LINK</span>
-          <input type="text" class="hw-input" id="inp-raw-link" placeholder="Paste Dropbox link...">
+        <div id="inspectorEmpty" style="color:#9c9b94; font-size:12px; line-height:1.6;">
+            Select a layer or add a <b>Media Layer</b> / <b>Clip Mask Plane</b>. Click any <b>◆</b> icon next to a parameter to keyframe it on the Master Timeline!
         </div>
-        <div class="prop-row">
-          <span class="prop-label">AES KEY</span>
-          <input type="password" class="hw-input" id="inp-aes-key" value="NIZHALI-V7-MASTER-KEY">
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">DOMAIN LOCK</span>
-          <input type="text" class="hw-input" id="inp-domain-lock" value="localhost,github.io">
-        </div>
-        <div class="crypto-vault-box">
-          <div style="font-size:9px; color:var(--ink-muted); margin-bottom:4px;">ENCRYPTED PAYLOAD HASH:</div>
-          <div id="cipher-output" style="font-size:9px; word-break:break-all;">[READY TO ENCRYPT]</div>
-        </div>
-        <div style="display:flex; gap:6px; margin-top:8px;">
-          <button class="hw-btn" id="btn-encrypt-link" style="flex:1;">ENCRYPT ASSET</button>
-          <button class="hw-btn accent-green" id="btn-save-json" style="flex:1;">EXPORT JSON</button>
-        </div>
-      </div>
-    </aside>
-  </div>
 
-  <script type="module" src="./modules/studio-main.js"></script>
+        <div id="inspectorControls" style="display:none;">
+            <label>Layer Name</label>
+            <input type="text" id="inpName" oninput="syncUIFromInspector()" onchange="saveHistoryState()">
+
+            <!-- Mask Plane Helper Toggle -->
+            <div id="maskPlaneCard" class="step-card" style="display:none; margin-top:8px; border-color:#00e5ff;">
+                <label class="toggle-row" style="margin:0;">
+                    <span style="color:#00e5ff; font-weight:600;">👁️ Show Cyan Helper Guide in Studio</span>
+                    <input type="checkbox" id="maskGuideToggle" checked onchange="syncMaskPlaneGuide()">
+                </label>
+                <small style="color:#9c9b94; font-size:10px; display:block; margin-top:4px;">
+                    This plane is <b>always 100% invisible</b> in the final AR output, and clips any layer assigned to it whether this guide is ON or OFF!
+                </small>
+            </div>
+
+            <!-- Media Source Card -->
+            <div id="mediaSourceCard" class="step-card" style="margin-top:8px;">
+                <label style="color:#00d66c; margin-top:0;">Dropbox Link (.mp4 / .png / .glb)</label>
+                <input type="text" id="inpUrl" placeholder="Paste Dropbox link..." oninput="handleDropboxUrl()">
+
+                <label style="margin-top:5px;">Or Local File (.mp4 / .png / .glb)</label>
+                <input type="file" id="inpLocalFile" accept="video/*,image/*,.glb,.gltf" style="font-size:10px; width:100%;" onchange="handleLocalFile(event)">
+
+                <div id="glbClipRow" style="display:none; margin-top:6px;">
+                    <label>Embedded 3D .glb Animation Clip</label>
+                    <select id="glbClipSelect" onchange="changeGlbClip()"></select>
+                </div>
+            </div>
+
+            <!-- 3D TRANSFORMS + KEYFRAME BUTTONS -->
+            <h3>
+                <span>Transform (0, 0, 0)</span>
+                <button class="kf-btn" id="kf-btn-transform" onclick="addKeyframeForGroup('transform')" title="Keyframe Pos/Scale/Rot at current time">◆ Keyframe Transform</button>
+            </h3>
+            <div class="row-3">
+                <div><label><span style="color:#ff4f00;">Pos X</span><button class="kf-btn" id="kf-posX" onclick="toggleParamKeyframe('posX')">◆</button></label><input type="number" id="posX" step="0.02" value="0" oninput="onParamEdit('posX')"></div>
+                <div><label><span style="color:#00d66c;">Pos Y</span><button class="kf-btn" id="kf-posY" onclick="toggleParamKeyframe('posY')">◆</button></label><input type="number" id="posY" step="0.02" value="0" oninput="onParamEdit('posY')"></div>
+                <div><label><span style="color:#00e5ff;">Pos Z</span><button class="kf-btn" id="kf-posZ" onclick="toggleParamKeyframe('posZ')">◆</button></label><input type="number" id="posZ" step="0.02" value="0" oninput="onParamEdit('posZ')"></div>
+            </div>
+            <div class="row-3" style="margin-top:4px;">
+                <div><label><span>Scale X</span><button class="kf-btn" id="kf-scaleX" onclick="toggleParamKeyframe('scaleX')">◆</button></label><input type="number" id="scaleX" step="0.05" value="1" oninput="onParamEdit('scaleX')"></div>
+                <div><label><span>Scale Y</span><button class="kf-btn" id="kf-scaleY" onclick="toggleParamKeyframe('scaleY')">◆</button></label><input type="number" id="scaleY" step="0.05" value="1" oninput="onParamEdit('scaleY')"></div>
+                <div><label><span>Scale Z</span><button class="kf-btn" id="kf-scaleZ" onclick="toggleParamKeyframe('scaleZ')">◆</button></label><input type="number" id="scaleZ" step="0.05" value="1" oninput="onParamEdit('scaleZ')"></div>
+            </div>
+            <div class="row-3" style="margin-top:4px;">
+                <div><label><span>Rot X</span><button class="kf-btn" id="kf-rotX" onclick="toggleParamKeyframe('rotX')">◆</button></label><input type="number" id="rotX" step="5" value="0" oninput="onParamEdit('rotX')"></div>
+                <div><label><span>Rot Y</span><button class="kf-btn" id="kf-rotY" onclick="toggleParamKeyframe('rotY')">◆</button></label><input type="number" id="rotY" step="5" value="0" oninput="onParamEdit('rotY')"></div>
+                <div><label><span>Rot Z</span><button class="kf-btn" id="kf-rotZ" onclick="toggleParamKeyframe('rotZ')">◆</button></label><input type="number" id="rotZ" step="5" value="0" oninput="onParamEdit('rotZ')"></div>
+            </div>
+
+            <!-- OPACITY & CLIPPING MASK SECTION -->
+            <div id="appearanceCard" class="step-card" style="margin-top:8px;">
+                <label>
+                    <span>💧 Layer Opacity (<span id="opacityVal">1.00</span>)</span>
+                    <button class="kf-btn" id="kf-opacity" onclick="toggleParamKeyframe('opacity')" title="Keyframe Opacity">◆</button>
+                </label>
+                <input type="range" id="inpOpacity" min="0" max="1" step="0.02" value="1" oninput="onParamEdit('opacity')">
+
+                <div style="border-top:1px solid #2e2e2b; margin-top:8px; padding-top:6px;">
+                    <label style="color:#00e5ff;">✂️ Clipping / Portal Mask Source (+Z & -Z!)</label>
+                    <select id="clipSourceSelect" onchange="syncEffectsFromInputs(); saveHistoryState();">
+                        <option value="none">None (Bleed Freely Outside Frame)</option>
+                        <option value="target">🕳️ Target Image Bounds (Portal Window)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- PRESET ANIMATIONS & CHROMA KEY -->
+            <div id="effectsCard" class="step-card">
+                <label style="color:#ffb800; margin-top:0;">✨ Loop Preset Animation</label>
+                <select id="animPreset" onchange="syncEffectsFromInputs(); updateMasterDuration(); saveHistoryState();">
+                    <option value="none">None</option>
+                    <option value="float">🎈 Floating (Smooth Bobbing)</option>
+                    <option value="spinY">🔄 Spin 360° (Y-Axis)</option>
+                    <option value="spinZ">🎡 Spin 360° (Z-Axis)</option>
+                    <option value="pulse">💓 Pulse Scale</option>
+                    <option value="wiggle">〰️ Wiggle Tilt</option>
+                    <option value="fadeIn">🌅 Fade In</option>
+                    <option value="fadeOut">🌇 Fade Out</option>
+                </select>
+
+                <div id="animParamsBox" style="display:none; margin-top:6px;">
+                    <div class="row-2">
+                        <div>
+                            <label><span>Speed (<span id="animSpeedVal">1.0</span>x)</span><button class="kf-btn" id="kf-animSpeed" onclick="toggleParamKeyframe('animSpeed')">◆</button></label>
+                            <input type="range" id="animSpeed" min="0.1" max="4.0" step="0.1" value="1.0" oninput="onParamEdit('animSpeed')">
+                        </div>
+                        <div>
+                            <label><span>Intensity (<span id="animAmpVal">1.0</span>x)</span><button class="kf-btn" id="kf-animAmp" onclick="toggleParamKeyframe('animAmp')">◆</button></label>
+                            <input type="range" id="animAmp" min="0.1" max="3.0" step="0.1" value="1.0" oninput="onParamEdit('animAmp')">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chroma Key Effect -->
+                <div id="chromaEffectSection" style="border-top:1px solid #2e2e2b; margin-top:8px; padding-top:6px;">
+                    <label class="toggle-row">
+                        <span>🟩 <b>Chroma Key Green/Blue Screen</b></span>
+                        <input type="checkbox" id="chromaToggle" onchange="syncEffectsFromInputs(); saveHistoryState();">
+                    </label>
+                    <div id="chromaParamsBox" style="display:none; margin-top:5px;">
+                        <label>Key Color</label>
+                        <input type="color" id="chromaColor" value="#00ff00" style="width:100%; height:24px; border:none; background:none; cursor:pointer;" oninput="syncEffectsFromInputs()">
+                        <label><span>Similarity (<span id="simVal">0.38</span>)</span><button class="kf-btn" id="kf-similarity" onclick="toggleParamKeyframe('similarity')">◆</button></label>
+                        <input type="range" id="chromaSim" min="0.05" max="0.8" step="0.01" value="0.38" oninput="onParamEdit('similarity')">
+                        <label><span>Smoothness (<span id="smoothVal">0.08</span>)</span><button class="kf-btn" id="kf-smoothness" onclick="toggleParamKeyframe('smoothness')">◆</button></label>
+                        <input type="range" id="chromaSmooth" min="0.01" max="0.3" step="0.01" value="0.08" oninput="onParamEdit('smoothness')">
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-danger" onclick="deleteSelectedLayers()">🗑️ Delete Selected</button>
+        </div>
+
+        <!-- V7 AES-256 SECURITY & LINK EXPORT -->
+        <div style="margin-top:auto; padding-top:10px; border-top:2px solid #2e2e2b;">
+            <div class="step-card" style="margin-bottom:6px;">
+                <label class="toggle-row" style="margin:0;">
+                    <span style="color:#ffb800; font-weight:700;">🔒 AES-256 Encrypt Scene Payload</span>
+                    <input type="checkbox" id="aesEncryptToggle">
+                </label>
+                <input type="text" id="domainLockInput" placeholder="Domain Lock (optional, e.g. github.io)" style="margin-top:5px;">
+            </div>
+            <button class="btn btn-primary" onclick="exportProject()">⚡ Generate V7 AR Link</button>
+            <div id="export-box"></div>
+        </div>
+    </div>
+
+    <!-- 4. BOTTOM DOCK: MASTER SCENE TIMELINE & KEYFRAME TRACK -->
+    <div id="timeline-dock">
+        <div class="timeline-header">
+            <div class="timeline-controls">
+                <button class="tl-btn" id="masterPlayBtn" onclick="toggleMasterPlay()">⏸ Pause</button>
+                <button class="tl-btn" onclick="scrubMasterTimeline(0)">⏮ 0.0s</button>
+                <button class="tl-btn" id="autoKeyBtn" onclick="toggleAutoKey()" title="Automatically create keyframes when changing values">🔴 Auto-Key: OFF</button>
+                <span style="font-size:12px; font-family:monospace; color:#ffb800; margin-left:6px;" id="masterTimeDisplay">0.00s / 0.00s (Static)</span>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:11px; color:#9c9b94;" id="durationModeBadge">Mode: Static (0s)</span>
+                <label style="margin:0; font-size:11px; color:#f0efe9;">Custom Loop Duration (s):</label>
+                <input type="number" id="customDurationInput" value="5" min="1" max="120" step="0.5" style="width:65px; padding:4px 6px;" onchange="updateMasterDuration()">
+            </div>
+        </div>
+
+        <div class="scrubber-container">
+            <input type="range" id="masterTimelineScrubber" min="0" max="5" step="0.01" value="0" oninput="scrubMasterTimeline(this.value)">
+            <div id="keyframeTrack" title="Click a yellow diamond to jump to keyframe, Right-Click diamond to delete it"></div>
+        </div>
+    </div>
+
+    <!-- Master V7 Modular Engine Entry Point (Loads your 6 files in /modules/) -->
+    <script type="module" src="./modules/studio-main.js"></script>
 </body>
 </html>
