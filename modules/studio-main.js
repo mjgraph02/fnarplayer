@@ -1,328 +1,38 @@
 // ============================================================================
-// MODULE 06 // STUDIO MOTHERBOARD: LAYERS, INSPECTOR, HIERARCHY & RENDER LOOP
+// MODULE 06 // HIERARCHY, INSPECTOR UI SYNC, SHORTCUTS & STUDIO BOOT
 // ============================================================================
 
-import {
-    StudioState, getPrimarySelectedItem, showToast,
-    scene, camera, renderer, transformControl,
-    updateCameraAnimation, setGizmoMode, setCameraPreset, focusSelectedLayer,
-    saveHistoryState, undo, redo, initViewportEvents
-} from './core-viewport.js';
+window.groupSelectedLayers = function() {
+    const valid = selectedIds.map(id => layers.find(l => l.id === id)).filter(l => l && !l.isFolder);
+    if (valid.length < 1) return alert('Select 1 or more layers to group!');
 
-import {
-    createChromaMaterial, updateLayerClippingAndOpacity
-} from './portal-clipping.js';
+    const fId = 'folder_' + Date.now();
+    const count = layers.filter(l => l.isFolder).length + 1;
+    const fObj = createLayerObject({ id: fId, name: `FOLDER_${count}`, isFolder: true, type: 'folder' });
 
-import {
-    updateMasterDuration, setParamBaseValue,
-    toggleParamKeyframe, addKeyframeForGroup, toggleAutoKey,
-    refreshKeyframeDiamonds, toggleMasterPlay, scrubMasterTimeline, evaluateSceneAtTime
-} from './timeline-keyframes.js';
-
-import {
-    setTrackingMode, applyTargetImageSource, loadTargetFromUrl,
-    compileMindInBrowser, loadToyReferenceFile, loadToyReferenceUrl,
-    scanToyPointCloud, updateFaceAnchorGuide
-} from './tracker-3d-epnp.js';
-
-import {
-    cleanDropbox, exportProject
-} from './dropbox-crypto.js';
-
-// Create Placeholder Canvas Texture for New Layers / Mask Planes
-function createPlaceholderTexture(label, isMask = false) {
-    const c = document.createElement('canvas');
-    c.width = 512; c.height = 512;
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = isMask ? 'rgba(0, 229, 255, 0.18)' : 'rgba(28, 28, 26, 0.9)';
-    ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = isMask ? '#00e5ff' : '#ff4f00';
-    ctx.lineWidth = 10;
-    if (isMask) ctx.setLineDash([20, 12]);
-    ctx.strokeRect(5, 5, 502, 502);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 26px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(label, 256, 240);
-    ctx.fillStyle = isMask ? '#00e5ff' : '#ffb800';
-    ctx.font = '15px monospace';
-    ctx.fillText(isMask ? 'Invisible Clip Window on AR Output' : 'Paste .mp4 / .png / .glb Link →', 256, 280);
-    return new THREE.CanvasTexture(c);
-}
-
-export function createLayerObject(cfg) {
-    const layer = {
-        id: cfg.id,
-        name: cfg.name,
-        isFolder: !!cfg.isFolder,
-        isMaskPlane: !!cfg.isMaskPlane,
-        showMaskGuide: cfg.showMaskGuide !== undefined ? cfg.showMaskGuide : true,
-        parentId: cfg.parentId || null,
-        type: cfg.type || (cfg.isMaskPlane ? 'mask' : 'video'),
-        url: cfg.url || '',
-        localBlobUrl: cfg.localBlobUrl || '',
-        pos: cfg.pos ? [...cfg.pos] : [0, 0, 0],
-        scale: cfg.scale ? [...cfg.scale] : [1, 1, 1],
-        rot: cfg.rot ? [...cfg.rot] : [0, 0, 0],
-        opacity: cfg.opacity !== undefined ? cfg.opacity : 1.0,
-        clipSource: cfg.clipSource || 'none',
-        chromaEnabled: !!cfg.chromaEnabled,
-        color: cfg.color || '#00ff00',
-        similarity: cfg.similarity ?? 0.38,
-        smoothness: cfg.smoothness ?? 0.08,
-        animPreset: cfg.animPreset || 'none',
-        animSpeed: cfg.animSpeed ?? 1.0,
-        animAmp: cfg.animAmp ?? 1.0,
-        keyframes: cfg.keyframes ? JSON.parse(JSON.stringify(cfg.keyframes)) : {},
-        mesh: null,
-        videoEl: null,
-        mixer: null,
-        clips: [],
-        activeAction: null,
-        duration: 0
-    };
-
-    if (layer.isFolder) {
-        const grp = new THREE.Group();
-        grp.userData.layerId = layer.id;
-        layer.mesh = grp;
-    } else if (layer.isMaskPlane) {
-        const tex = createPlaceholderTexture(layer.name, true);
-        const geo = new THREE.PlaneGeometry(1, 1);
-        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
-        layer.mesh = new THREE.Mesh(geo, mat);
-        layer.mesh.userData.layerId = layer.id;
-        layer.mesh.visible = layer.showMaskGuide;
-    } else {
-        const tex = createPlaceholderTexture(layer.name, false);
-        const geo = new THREE.PlaneGeometry(1, 1);
-        const mat = createChromaMaterial(tex, layer.color, layer.similarity, layer.smoothness, false);
-        layer.mesh = new THREE.Mesh(geo, mat);
-        layer.mesh.userData.layerId = layer.id;
-    }
-
-    layer.mesh.position.set(...layer.pos);
-    layer.mesh.scale.set(...layer.scale);
-    layer.mesh.rotation.set(
-        THREE.MathUtils.degToRad(layer.rot[0]),
-        THREE.MathUtils.degToRad(layer.rot[1]),
-        THREE.MathUtils.degToRad(layer.rot[2])
-    );
-
-    scene.add(layer.mesh);
-    return layer;
-}
-
-function addMediaLayer() {
-    const id = 'layer_' + Date.now();
-    const count = StudioState.layers.filter(l => !l.isFolder && !l.isMaskPlane).length + 1;
-    const layer = createLayerObject({
-        id,
-        name: `Layer ${count}`,
-        type: 'video',
-        pos: [0, 0, 0], scale: [1, 1, 1], rot: [0, 0, 0]
-    });
-    StudioState.layers.push(layer);
-    selectSingleLayer(id);
-    updateMasterDuration();
-    saveHistoryState();
-    showToast(`➕ Added "${layer.name}" at (0, 0, 0)`);
-}
-
-function addClipMaskPlane() {
-    const id = 'mask_' + Date.now();
-    const count = StudioState.layers.filter(l => l.isMaskPlane).length + 1;
-    const maskLayer = createLayerObject({
-        id,
-        name: `✂️ Clip Mask Plane ${count}`,
-        isMaskPlane: true,
-        type: 'mask',
-        pos: [0, 0, 0], scale: [1, 1, 1], rot: [0, 0, 0]
-    });
-    StudioState.layers.push(maskLayer);
-    selectSingleLayer(id);
-    saveHistoryState();
-    showToast(`✂️ Added "${maskLayer.name}" — Assign any layer to clip inside it!`);
-}
-
-function syncMaskPlaneGuide() {
-    const layer = getPrimarySelectedItem();
-    if (!layer || !layer.isMaskPlane) return;
-    layer.showMaskGuide = document.getElementById('maskGuideToggle').checked;
-    if (layer.mesh) layer.mesh.visible = layer.showMaskGuide;
-}
-
-function detectMediaType(urlOrFilename) {
-    const clean = urlOrFilename.split('?')[0].toLowerCase();
-    if (clean.endsWith('.glb') || clean.endsWith('.gltf')) return 'glb';
-    if (clean.endsWith('.png') || clean.endsWith('.jpg') || clean.endsWith('.jpeg') || clean.endsWith('.webp')) return 'image';
-    return 'video';
-}
-
-function applyMediaToLayer(layer, mediaSourceUrl, fileHint = '', silent = false) {
-    if (!mediaSourceUrl || layer.isFolder || layer.isMaskPlane) return;
-    layer.type = detectMediaType(fileHint || layer.url || mediaSourceUrl);
-
-    const parentContainer = (layer.parentId && StudioState.layers.find(l => l.id === layer.parentId)?.mesh) || scene;
-
-    if (layer.videoEl) { layer.videoEl.pause(); layer.videoEl.remove(); layer.videoEl = null; }
-    if (layer.mixer) { layer.mixer.stopAllAction(); layer.mixer = null; layer.clips = []; }
-
-    if (layer.type === 'video') {
-        const vid = document.createElement('video');
-        vid.crossOrigin = 'anonymous';
-        vid.src = mediaSourceUrl;
-        vid.loop = true;
-        vid.muted = true;
-        vid.playsInline = true;
-        layer.videoEl = vid;
-        if (StudioState.masterPlaying) vid.play().catch(() => {});
-
-        const vidTex = new THREE.VideoTexture(vid);
-        vidTex.minFilter = THREE.LinearFilter;
-        vidTex.magFilter = THREE.LinearFilter;
-
-        if (layer.mesh.isGroup) {
-            transformControl.detach();
-            parentContainer.remove(layer.mesh);
-            layer.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial());
-            layer.mesh.userData.layerId = layer.id;
-            parentContainer.add(layer.mesh);
-        }
-
-        vid.addEventListener('loadedmetadata', () => {
-            layer.duration = vid.duration || 0;
-            if (vid.videoWidth && vid.videoHeight) {
-                const aspect = vid.videoHeight / vid.videoWidth;
-                layer.mesh.geometry.dispose();
-                layer.mesh.geometry = new THREE.PlaneGeometry(1, aspect);
-            }
-            updateMasterDuration();
-            refreshInspectorUI();
-            if (!silent) showToast('🎬 Video loaded & synced to Master Timeline!');
-        });
-
-        layer.mesh.material = createChromaMaterial(vidTex, layer.color, layer.similarity, layer.smoothness, layer.chromaEnabled);
-
-    } else if (layer.type === 'image') {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-            const tex = new THREE.Texture(img);
-            tex.encoding = THREE.sRGBEncoding;
-            tex.needsUpdate = true;
-            const aspect = img.height / img.width;
-
-            if (layer.mesh.isGroup) {
-                transformControl.detach();
-                parentContainer.remove(layer.mesh);
-                layer.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, aspect), new THREE.MeshBasicMaterial());
-                layer.mesh.userData.layerId = layer.id;
-                parentContainer.add(layer.mesh);
-            } else {
-                layer.mesh.geometry.dispose();
-                layer.mesh.geometry = new THREE.PlaneGeometry(1, aspect);
-            }
-
-            layer.mesh.material = createChromaMaterial(tex, layer.color, layer.similarity, layer.smoothness, layer.chromaEnabled);
-            layer.duration = 0;
-            updateMasterDuration();
-            refreshInspectorUI();
-            if (!silent) showToast('🖼️ Image loaded!');
-        };
-        img.src = mediaSourceUrl;
-
-    } else if (layer.type === 'glb') {
-        const loader = new THREE.GLTFLoader();
-        loader.setCrossOrigin('anonymous');
-        loader.load(mediaSourceUrl, (gltf) => {
-            transformControl.detach();
-            parentContainer.remove(layer.mesh);
-
-            const model = gltf.scene;
-            const box = new THREE.Box3().setFromObject(model);
-            const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z) || 1;
-            const normScale = 0.5 / maxDim;
-            model.scale.set(normScale, normScale, normScale);
-
-            const wrapper = new THREE.Group();
-            wrapper.add(model);
-            wrapper.userData.layerId = layer.id;
-            wrapper.position.set(...layer.pos);
-            wrapper.scale.set(...layer.scale);
-            wrapper.rotation.set(
-                THREE.MathUtils.degToRad(layer.rot[0]),
-                THREE.MathUtils.degToRad(layer.rot[1]),
-                THREE.MathUtils.degToRad(layer.rot[2])
-            );
-
-            layer.mesh = wrapper;
-            parentContainer.add(wrapper);
-
-            if (gltf.animations && gltf.animations.length > 0) {
-                layer.mixer = new THREE.AnimationMixer(model);
-                layer.clips = gltf.animations;
-                layer.activeAction = layer.mixer.clipAction(gltf.animations[0]);
-                layer.activeAction.play();
-                layer.duration = gltf.animations[0].duration || 0;
-            } else {
-                layer.duration = 0;
-            }
-
-            updateMasterDuration();
-            if (StudioState.selectedIds.includes(layer.id)) transformControl.attach(wrapper);
-            refreshInspectorUI();
-            if (!silent) showToast('🧊 3D .glb Model loaded!');
-        });
-    }
-}
-
-function groupSelectedLayers() {
-    const validTargets = StudioState.selectedIds
-        .map(id => StudioState.layers.find(l => l.id === id))
-        .filter(l => l && !l.isFolder);
-
-    if (validTargets.length < 1) {
-        alert('Ctrl+Click or Shift+Click layers in the Hierarchy to group them!');
-        return;
-    }
-
-    const folderId = 'folder_' + Date.now();
-    const count = StudioState.layers.filter(l => l.isFolder).length + 1;
-    const folderObj = createLayerObject({
-        id: folderId,
-        name: `📁 Folder Group ${count}`,
-        isFolder: true,
-        type: 'folder',
-        pos: [0, 0, 0], scale: [1, 1, 1], rot: [0, 0, 0]
-    });
-
-    validTargets.forEach(child => {
-        child.parentId = folderId;
-        if (child.mesh) {
-            folderObj.mesh.attach(child.mesh);
-            child.pos = [
-                parseFloat(child.mesh.position.x.toFixed(3)),
-                parseFloat(child.mesh.position.y.toFixed(3)),
-                parseFloat(child.mesh.position.z.toFixed(3))
+    valid.forEach(ch => {
+        ch.parentId = fId;
+        if (ch.mesh) {
+            fObj.mesh.attach(ch.mesh);
+            ch.pos = [
+                parseFloat(ch.mesh.position.x.toFixed(3)),
+                parseFloat(ch.mesh.position.y.toFixed(3)),
+                parseFloat(ch.mesh.position.z.toFixed(3))
             ];
         }
     });
+    layers.push(fObj);
+    selectSingleLayer(fId);
+    if (window.saveHistoryState) saveHistoryState();
+};
 
-    StudioState.layers.push(folderObj);
-    selectSingleLayer(folderId);
-    saveHistoryState();
-    showToast(`📁 Grouped into "${folderObj.name}"`);
-}
-
-function ungroupSelectedFolder() {
+window.ungroupSelectedFolder = function() {
     const item = getPrimarySelectedItem();
     if (!item) return;
-    const folder = item.isFolder ? item : StudioState.layers.find(l => l.id === item.parentId);
+    const folder = item.isFolder ? item : layers.find(l => l.id === item.parentId);
     if (!folder || !folder.isFolder) return;
 
-    const children = StudioState.layers.filter(l => l.parentId === folder.id);
+    const children = layers.filter(l => l.parentId === folder.id);
     children.forEach(ch => {
         ch.parentId = null;
         if (ch.mesh) {
@@ -334,42 +44,39 @@ function ungroupSelectedFolder() {
             ];
         }
     });
-
     transformControl.detach();
     scene.remove(folder.mesh);
-    StudioState.layers = StudioState.layers.filter(l => l.id !== folder.id);
-    StudioState.selectedIds = children.map(c => c.id);
+    const slot = getActiveTargetSlot();
+    slot.layers = layers.filter(l => l.id !== folder.id);
+    layers = slot.layers;
+    selectedIds = children.map(c => c.id);
     updateSelectionState();
-    saveHistoryState();
-}
+    if (window.saveHistoryState) saveHistoryState();
+};
 
-function selectSingleLayer(id) {
-    StudioState.selectedIds = id ? [id] : [];
-    StudioState.lastClickedId = id;
+window.selectSingleLayer = function(id) {
+    selectedIds = id ? [id] : [];
+    lastClickedId = id;
     updateSelectionState();
-}
+};
 
-function handleLayerClick(id, event) {
-    if (event && (event.ctrlKey || event.metaKey)) {
-        if (StudioState.selectedIds.includes(id)) StudioState.selectedIds = StudioState.selectedIds.filter(x => x !== id);
-        else StudioState.selectedIds.push(id);
-        StudioState.lastClickedId = id;
-    } else if (event && event.shiftKey && StudioState.lastClickedId) {
-        const allIds = StudioState.layers.map(l => l.id);
-        const s = allIds.indexOf(StudioState.lastClickedId);
-        const e = allIds.indexOf(id);
-        if (s !== -1 && e !== -1) {
-            const [low, high] = s < e ? [s, e] : [e, s];
-            StudioState.selectedIds = allIds.slice(low, high + 1);
-        }
+window.handleLayerClick = function(id, ev) {
+    if (ev && (ev.ctrlKey || ev.metaKey)) {
+        if (selectedIds.includes(id)) selectedIds = selectedIds.filter(x => x !== id);
+        else selectedIds.push(id);
+        lastClickedId = id;
+    } else if (ev && ev.shiftKey && lastClickedId) {
+        const all = layers.map(l => l.id);
+        const s = all.indexOf(lastClickedId), e = all.indexOf(id);
+        if (s !== -1 && e !== -1) selectedIds = all.slice(Math.min(s, e), Math.max(s, e) + 1);
     } else {
-        StudioState.selectedIds = [id];
-        StudioState.lastClickedId = id;
+        selectedIds = [id];
+        lastClickedId = id;
     }
     updateSelectionState();
-}
+};
 
-function updateSelectionState() {
+window.updateSelectionState = function() {
     renderLayerList();
     const primary = getPrimarySelectedItem();
 
@@ -389,224 +96,193 @@ function updateSelectionState() {
     if (primary.mesh) transformControl.attach(primary.mesh);
     refreshInspectorUI();
     refreshKeyframeDiamonds();
-}
+};
 
-function populateInspectorNumbers(layer) {
-    document.getElementById('posX').value = layer.pos[0];
-    document.getElementById('posY').value = layer.pos[1];
-    document.getElementById('posZ').value = layer.pos[2];
-    document.getElementById('scaleX').value = layer.scale[0];
-    document.getElementById('scaleY').value = layer.scale[1];
-    document.getElementById('scaleZ').value = layer.scale[2];
-    document.getElementById('rotX').value = layer.rot[0];
-    document.getElementById('rotY').value = layer.rot[1];
-    document.getElementById('rotZ').value = layer.rot[2];
-}
+window.refreshInspectorUI = function() {
+    const l = getPrimarySelectedItem();
+    if (!l) return;
 
-function refreshInspectorUI() {
-    const layer = getPrimarySelectedItem();
-    if (!layer) return;
+    document.getElementById('inpName').value = l.name;
+    document.getElementById('maskPlaneCard').style.display = l.isMaskPlane ? 'block' : 'none';
+    if (l.isMaskPlane) document.getElementById('maskGuideToggle').checked = l.showMaskGuide;
 
-    document.getElementById('inpName').value = layer.name;
-    document.getElementById('maskPlaneCard').style.display = layer.isMaskPlane ? 'block' : 'none';
-    if (layer.isMaskPlane) {
-        document.getElementById('maskGuideToggle').checked = layer.showMaskGuide;
-    }
+    const isMedia = (!l.isFolder && !l.isMaskPlane);
+    document.getElementById('mediaSourceCard').style.display = isMedia ? 'block' : 'none';
+    document.getElementById('appearanceCard').style.display  = isMedia ? 'block' : 'none';
+    document.getElementById('effectsCard').style.display     = isMedia ? 'block' : 'none';
 
-    const isRegularMedia = (!layer.isFolder && !layer.isMaskPlane);
-    document.getElementById('mediaSourceCard').style.display = isRegularMedia ? 'block' : 'none';
-    document.getElementById('appearanceCard').style.display = isRegularMedia ? 'block' : 'none';
-    document.getElementById('effectsCard').style.display = isRegularMedia ? 'block' : 'none';
-
-    if (isRegularMedia) {
-        document.getElementById('inpUrl').value = layer.url;
-        document.getElementById('inpOpacity').value = layer.opacity ?? 1.0;
-        document.getElementById('opacityVal').textContent = (layer.opacity ?? 1.0).toFixed(2);
+    if (isMedia) {
+        document.getElementById('inpUrl').value = l.url;
+        document.getElementById('inpOpacity').value = l.opacity ?? 1.0;
+        document.getElementById('opacityVal').textContent = (l.opacity ?? 1.0).toFixed(2);
 
         const clipSel = document.getElementById('clipSourceSelect');
-        const maskPlanes = StudioState.layers.filter(m => m.isMaskPlane);
-        let optsHtml = `
-            <option value="none">None (Bleed Freely Outside Frame)</option>
-            <option value="target">🕳️ Target Image Bounds (Portal Window)</option>
-        `;
-        maskPlanes.forEach(mp => {
-            optsHtml += `<option value="${mp.id}">✂️ ${mp.name}</option>`;
+        let opts = '<option value="none">None (Unclipped)</option><option value="target">🕳️ Target Frame Bounds</option>';
+        layers.filter(m => m.isMaskPlane).forEach(mp => {
+            opts += `<option value="${mp.id}">✂️ ${mp.name}</option>`;
         });
-        clipSel.innerHTML = optsHtml;
-        clipSel.value = layer.clipSource || 'none';
+        clipSel.innerHTML = opts;
+        clipSel.value = l.clipSource || 'none';
 
-        document.getElementById('animPreset').value = layer.animPreset || 'none';
-        document.getElementById('animParamsBox').style.display = (layer.animPreset && layer.animPreset !== 'none') ? 'block' : 'none';
-        document.getElementById('animSpeed').value = layer.animSpeed ?? 1.0;
-        document.getElementById('animAmp').value = layer.animAmp ?? 1.0;
-        document.getElementById('animSpeedVal').textContent = layer.animSpeed ?? 1.0;
-        document.getElementById('animAmpVal').textContent = layer.animAmp ?? 1.0;
+        const glbRow = document.getElementById('glbClipRow');
+        const glbSel = document.getElementById('glbClipSelect');
+        if (l.type === 'glb' && l.clips && l.clips.length > 0) {
+            glbRow.style.display = 'block';
+            glbSel.innerHTML = l.clips.map((c, idx) => `<option value="${idx}">${c.name || ('Clip ' + (idx + 1))}</option>`).join('');
+        } else {
+            glbRow.style.display = 'none';
+        }
+
+        document.getElementById('animPreset').value = l.animPreset || 'none';
+        document.getElementById('animParamsBox').style.display = (l.animPreset && l.animPreset !== 'none') ? 'block' : 'none';
+        document.getElementById('animSpeed').value = l.animSpeed ?? 1.0;
+        document.getElementById('animAmp').value = l.animAmp ?? 1.0;
+        document.getElementById('animSpeedVal').textContent = l.animSpeed ?? 1.0;
+        document.getElementById('animAmpVal').textContent = l.animAmp ?? 1.0;
 
         const chromaSec = document.getElementById('chromaEffectSection');
-        chromaSec.style.display = (layer.type === 'video' || layer.type === 'image') ? 'block' : 'none';
-        document.getElementById('chromaToggle').checked = !!layer.chromaEnabled;
-        document.getElementById('chromaParamsBox').style.display = layer.chromaEnabled ? 'block' : 'none';
-        document.getElementById('chromaColor').value = layer.color || '#00ff00';
-        document.getElementById('chromaSim').value = layer.similarity ?? 0.38;
-        document.getElementById('chromaSmooth').value = layer.smoothness ?? 0.08;
+        chromaSec.style.display = (l.type === 'video' || l.type === 'image') ? 'block' : 'none';
+        document.getElementById('chromaToggle').checked = !!l.chromaEnabled;
+        document.getElementById('chromaParamsBox').style.display = l.chromaEnabled ? 'block' : 'none';
+        document.getElementById('chromaColor').value = l.color || '#00ff00';
+        document.getElementById('chromaSim').value = l.similarity ?? 0.38;
+        document.getElementById('chromaSmooth').value = l.smoothness ?? 0.08;
+        document.getElementById('simVal').textContent = l.similarity ?? 0.38;
+        document.getElementById('smoothVal').textContent = l.smoothness ?? 0.08;
     }
 
-    populateInspectorNumbers(layer);
-}
+    populateInspectorNumbers(l);
+};
 
-function syncUIFromInspector() {
-    const layer = getPrimarySelectedItem();
-    if (!layer) return;
-    layer.name = document.getElementById('inpName').value;
+window.populateInspectorNumbers = function(l) {
+    document.getElementById('posX').value = l.pos[0];
+    document.getElementById('posY').value = l.pos[1];
+    document.getElementById('posZ').value = l.pos[2];
+    document.getElementById('scaleX').value = l.scale[0];
+    document.getElementById('scaleY').value = l.scale[1];
+    document.getElementById('scaleZ').value = l.scale[2];
+    document.getElementById('rotX').value = l.rot[0];
+    document.getElementById('rotY').value = l.rot[1];
+    document.getElementById('rotZ').value = l.rot[2];
+};
+
+window.syncUIFromInspector = function() {
+    const l = getPrimarySelectedItem();
+    if (!l) return;
+    l.name = document.getElementById('inpName').value;
     renderLayerList();
-}
+};
 
-function applyTransformAndEffectsImmediate(layer) {
-    if (!layer || !layer.mesh) return;
-    layer.mesh.position.set(...layer.pos);
-    layer.mesh.scale.set(...layer.scale);
-    layer.mesh.rotation.set(
-        THREE.MathUtils.degToRad(layer.rot[0]),
-        THREE.MathUtils.degToRad(layer.rot[1]),
-        THREE.MathUtils.degToRad(layer.rot[2])
+window.applyTransformAndEffectsImmediate = function(l) {
+    if (!l || !l.mesh) return;
+    l.mesh.position.set(...l.pos);
+    l.mesh.scale.set(...l.scale);
+    l.mesh.rotation.set(
+        THREE.MathUtils.degToRad(l.rot[0]),
+        THREE.MathUtils.degToRad(l.rot[1]),
+        THREE.MathUtils.degToRad(l.rot[2])
     );
-    updateLayerClippingAndOpacity(layer, layer.opacity ?? 1.0);
-}
+    updateLayerClippingAndOpacity(l, l.opacity ?? 1.0);
+};
 
-function onParamEdit(param) {
-    const layer = getPrimarySelectedItem();
-    if (!layer) return;
+window.syncEffectsFromInputs = function() {
+    const l = getPrimarySelectedItem();
+    if (!l || l.isFolder || l.isMaskPlane) return;
 
-    const inputMap = {
-        posX: 'posX', posY: 'posY', posZ: 'posZ',
-        scaleX: 'scaleX', scaleY: 'scaleY', scaleZ: 'scaleZ',
-        rotX: 'rotX', rotY: 'rotY', rotZ: 'rotZ',
-        opacity: 'inpOpacity', animSpeed: 'animSpeed', animAmp: 'animAmp',
-        similarity: 'chromaSim', smoothness: 'chromaSmooth'
-    };
-    const el = document.getElementById(inputMap[param]);
-    if (!el) return;
-    const val = parseFloat(el.value) || 0;
-    setParamBaseValue(layer, param, val);
+    l.clipSource = document.getElementById('clipSourceSelect').value;
+    l.animPreset = document.getElementById('animPreset').value;
+    document.getElementById('animParamsBox').style.display = (l.animPreset !== 'none') ? 'block' : 'none';
 
-    if (param === 'opacity') document.getElementById('opacityVal').textContent = val.toFixed(2);
-    if (param === 'animSpeed') document.getElementById('animSpeedVal').textContent = val;
-    if (param === 'animAmp') document.getElementById('animAmpVal').textContent = val;
-    if (param === 'similarity') document.getElementById('simVal').textContent = val;
-    if (param === 'smoothness') document.getElementById('smoothVal').textContent = val;
+    l.chromaEnabled = document.getElementById('chromaToggle').checked;
+    document.getElementById('chromaParamsBox').style.display = l.chromaEnabled ? 'block' : 'none';
+    l.color = document.getElementById('chromaColor').value;
 
-    if (StudioState.autoKeyEnabled || (layer.keyframes && layer.keyframes[param] && layer.keyframes[param].length > 0)) {
-        toggleParamKeyframe(param);
+    if (l.mesh && l.mesh.material && l.mesh.material.uniforms) {
+        l.mesh.material.uniforms.enableChroma.value = l.chromaEnabled ? 1.0 : 0.0;
+        l.mesh.material.uniforms.color.value.set(l.color);
     }
-
-    applyTransformAndEffectsImmediate(layer);
+    updateLayerClippingAndOpacity(l, l.opacity ?? 1.0);
     renderLayerList();
-}
+};
 
-function syncEffectsFromInputs() {
-    const layer = getPrimarySelectedItem();
-    if (!layer || layer.isFolder || layer.isMaskPlane) return;
-
-    layer.clipSource = document.getElementById('clipSourceSelect').value;
-    layer.animPreset = document.getElementById('animPreset').value;
-    document.getElementById('animParamsBox').style.display = (layer.animPreset !== 'none') ? 'block' : 'none';
-
-    layer.chromaEnabled = document.getElementById('chromaToggle').checked;
-    document.getElementById('chromaParamsBox').style.display = layer.chromaEnabled ? 'block' : 'none';
-    layer.color = document.getElementById('chromaColor').value;
-
-    if (layer.mesh && layer.mesh.material && layer.mesh.material.uniforms) {
-        layer.mesh.material.uniforms.enableChroma.value = layer.chromaEnabled ? 1.0 : 0.0;
-        layer.mesh.material.uniforms.color.value.set(layer.color);
-    }
-    updateLayerClippingAndOpacity(layer, layer.opacity ?? 1.0);
-    renderLayerList();
-}
-
-function handleLocalFile(e) {
+window.handleLocalFile = function(e) {
     const file = e.target.files[0];
-    const layer = getPrimarySelectedItem();
-    if (!file || !layer) return;
-    layer.localBlobUrl = URL.createObjectURL(file);
-    applyMediaToLayer(layer, layer.localBlobUrl, file.name);
-    saveHistoryState();
-}
+    const l = getPrimarySelectedItem();
+    if (!file || !l) return;
+    l.localBlobUrl = URL.createObjectURL(file);
+    applyMediaToLayer(l, l.localBlobUrl, file.name);
+    if (window.saveHistoryState) saveHistoryState();
+};
 
 let urlFetchTimer = null;
-function handleDropboxUrl() {
-    const layer = getPrimarySelectedItem();
-    if (!layer) return;
-    layer.url = document.getElementById('inpUrl').value.trim();
+window.handleDropboxUrl = function() {
+    const l = getPrimarySelectedItem();
+    if (!l) return;
+    l.url = document.getElementById('inpUrl').value.trim();
     clearTimeout(urlFetchTimer);
-    if (layer.url) {
+    if (l.url) {
         urlFetchTimer = setTimeout(() => {
-            applyMediaToLayer(layer, cleanDropbox(layer.url), layer.url);
-            saveHistoryState();
+            applyMediaToLayer(l, cleanDropbox(l.url), l.url);
+            if (window.saveHistoryState) saveHistoryState();
         }, 400);
     }
-}
+};
 
-function deleteSelectedLayers() {
-    if (StudioState.selectedIds.length === 0) return;
+window.deleteSelectedLayers = function() {
+    if (selectedIds.length === 0) return;
     transformControl.detach();
-
-    StudioState.selectedIds.forEach(id => {
-        const layer = StudioState.layers.find(l => l.id === id);
-        if (!layer) return;
-        if (layer.isFolder) {
-            StudioState.layers.filter(c => c.parentId === layer.id).forEach(ch => {
+    selectedIds.forEach(id => {
+        const l = layers.find(x => x.id === id);
+        if (!l) return;
+        if (l.isFolder) {
+            layers.filter(c => c.parentId === l.id).forEach(ch => {
                 ch.parentId = null;
                 if (ch.mesh) scene.attach(ch.mesh);
             });
         }
-        if (layer.mesh && layer.mesh.parent) layer.mesh.parent.remove(layer.mesh);
-        if (layer.videoEl) { layer.videoEl.pause(); layer.videoEl.remove(); }
+        if (l.mesh && l.mesh.parent) l.mesh.parent.remove(l.mesh);
+        if (l.videoEl) { l.videoEl.pause(); l.videoEl.remove(); }
     });
-
-    StudioState.layers = StudioState.layers.filter(l => !StudioState.selectedIds.includes(l.id));
-    StudioState.selectedIds = StudioState.layers.length ? [StudioState.layers[StudioState.layers.length - 1].id] : [];
+    const slot = getActiveTargetSlot();
+    slot.layers = layers.filter(l => !selectedIds.includes(l.id));
+    layers = slot.layers;
+    selectedIds = layers.length ? [layers[layers.length - 1].id] : [];
     updateMasterDuration();
     updateSelectionState();
-    saveHistoryState();
-}
+    if (window.saveHistoryState) saveHistoryState();
+};
 
-function renderLayerList() {
+window.renderLayerList = function() {
     const list = document.getElementById('layerList');
-    if (StudioState.layers.length === 0) {
-        list.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">No layers added yet.</div>';
+    if (!layers || layers.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted); font-size:10px; padding:6px 0;">NO LAYERS IN TARGET</div>';
         return;
     }
     list.innerHTML = '';
-    StudioState.layers.filter(l => !l.parentId).forEach(item => {
+    layers.filter(l => !l.parentId).forEach(item => {
         appendHierarchyRow(list, item, false);
         if (item.isFolder) {
-            StudioState.layers.filter(ch => ch.parentId === item.id).forEach(child => appendHierarchyRow(list, child, true));
+            layers.filter(ch => ch.parentId === item.id).forEach(child => appendHierarchyRow(list, child, true));
         }
     });
-}
+};
 
 function appendHierarchyRow(containerEl, l, isChild) {
     const item = document.createElement('div');
-    const isPrimary = (StudioState.selectedIds[StudioState.selectedIds.length - 1] === l.id);
-    const isMulti = StudioState.selectedIds.includes(l.id);
+    const isPrimary = (selectedIds[selectedIds.length - 1] === l.id);
+    const isMulti = selectedIds.includes(l.id);
     item.className = 'layer-item' + (isPrimary ? ' active' : (isMulti ? ' multi-selected' : '')) + (isChild ? ' child-layer' : '');
 
-    const icon = l.isFolder ? '' : (l.isMaskPlane ? '' : (l.type === 'glb' ? '🧊 ' : (l.type === 'image' ? '🖼️ ' : '🎬 ')));
+    const icon = l.isFolder ? '📁 ' : (l.isMaskPlane ? '✂️ ' : (l.type === 'glb' ? '🧊 ' : (l.type === 'image' ? '🖼️ ' : '🎬 ')));
     const titleSpan = document.createElement('span');
     titleSpan.textContent = icon + l.name;
-    titleSpan.style.flex = '1';
 
     const rightGroup = document.createElement('div');
-    rightGroup.style.display = 'flex';
-    rightGroup.style.alignItems = 'center';
-
     const zBadge = document.createElement('small');
-    const isClipped = (l.clipSource && l.clipSource !== 'none');
-    zBadge.style.color = isClipped ? '#00e5ff' : '#ffb800';
-    zBadge.textContent = `${isClipped ? '✂ ' : ''}Z:${l.pos[2]}`;
+    zBadge.textContent = `Z:${l.pos[2]}`;
 
     const findBtn = document.createElement('button');
-    findBtn.className = 'layer-focus-btn';
+    findBtn.className = 'mini-btn';
     findBtn.textContent = '🎯';
     findBtn.onclick = (e) => {
         e.stopPropagation();
@@ -622,93 +298,134 @@ function appendHierarchyRow(containerEl, l, isChild) {
     containerEl.appendChild(item);
 }
 
-function restoreFromSnapshot(jsonSnap) {
-    StudioState.isRestoringHistory = true;
-    const state = JSON.parse(jsonSnap);
-    transformControl.detach();
+// Gizmo, Camera Presets & Keyboard Shortcuts
+let spaceHeld = false;
 
-    StudioState.layers.forEach(l => {
-        if (l.mesh && l.mesh.parent) l.mesh.parent.remove(l.mesh);
-        if (l.videoEl) { layer.videoEl?.pause(); l.videoEl.remove(); }
-    });
-    StudioState.layers = [];
+transformControl.addEventListener('dragging-changed', (ev) => {
+    orbit.enabled = !ev.value;
+    if (!ev.value) {
+        if (autoKeyEnabled) addKeyframeForGroup('transform');
+        if (window.saveHistoryState) saveHistoryState();
+    }
+});
 
-    state.layers.filter(s => s.isFolder).forEach(s => StudioState.layers.push(createLayerObject(s)));
-    state.layers.filter(s => !s.isFolder).forEach(s => {
-        const l = createLayerObject(s);
-        if (l.parentId) {
-            const parentFolder = StudioState.layers.find(f => f.id === l.parentId);
-            if (parentFolder && parentFolder.mesh) parentFolder.mesh.add(l.mesh);
-        }
-        const src = l.localBlobUrl || cleanDropbox(l.url);
-        if (src && !l.isMaskPlane) applyMediaToLayer(l, src, l.url, true);
-        StudioState.layers.push(l);
-    });
-
-    StudioState.selectedIds = state.selectedIds || [];
-    updateMasterDuration();
-    updateSelectionState();
-    document.getElementById('btn-undo').disabled = (StudioState.historyIndex <= 0);
-    document.getElementById('btn-redo').disabled = (StudioState.historyIndex >= StudioState.historyStack.length - 1);
-    StudioState.isRestoringHistory = false;
-}
-
-// Wire Module Callbacks & Expose Global Handlers for HTML Buttons
-StudioState.onLayerMoved = (activeItem) => {
-    populateInspectorNumbers(activeItem);
+transformControl.addEventListener('change', () => {
+    const active = getPrimarySelectedItem();
+    if (!active || !active.mesh) return;
+    const m = active.mesh;
+    active.pos = [+m.position.x.toFixed(3), +m.position.y.toFixed(3), +m.position.z.toFixed(3)];
+    active.scale = [+m.scale.x.toFixed(3), +m.scale.y.toFixed(3), +m.scale.z.toFixed(3)];
+    active.rot = [
+        +THREE.MathUtils.radToDeg(m.rotation.x).toFixed(1),
+        +THREE.MathUtils.radToDeg(m.rotation.y).toFixed(1),
+        +THREE.MathUtils.radToDeg(m.rotation.z).toFixed(1)
+    ];
+    populateInspectorNumbers(active);
     renderLayerList();
-};
-StudioState.onAutoKeyTransform = () => addKeyframeForGroup('transform');
-StudioState.onRestoreSnapshot = restoreFromSnapshot;
-
-Object.assign(window, {
-    setTrackingMode, loadTargetFromUrl, compileMindInBrowser,
-    loadToyReferenceFile, loadToyReferenceUrl, scanToyPointCloud, updateFaceAnchorGuide,
-    addMediaLayer, addClipMaskPlane, groupSelectedLayers, ungroupSelectedFolder,
-    undo, redo, setGizmoMode, focusSelectedLayer, setCameraPreset,
-    syncUIFromInspector, saveHistoryState, syncMaskPlaneGuide,
-    handleDropboxUrl, handleLocalFile, addKeyframeForGroup, toggleParamKeyframe,
-    onParamEdit, syncEffectsFromInputs, updateMasterDuration, deleteSelectedLayers,
-    exportProject: () => exportProject(selectSingleLayer),
-    toggleMasterPlay, scrubMasterTimeline, toggleAutoKey
 });
 
-document.getElementById('targetImgInput')?.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) applyTargetImageSource(URL.createObjectURL(file));
-});
-
-// Master Render Loop
-const clock = new THREE.Clock();
-function animate() {
-    requestAnimationFrame(animate);
-    const delta = clock.getDelta();
-
-    if (StudioState.masterPlaying && StudioState.masterDuration > 0) {
-        StudioState.masterTime = (StudioState.masterTime + delta) % StudioState.masterDuration;
-        const scrubber = document.getElementById('masterTimelineScrubber');
-        if (document.activeElement !== scrubber) {
-            scrubber.value = StudioState.masterTime;
-        }
-    }
-
-    StudioState.layers.forEach(l => {
-        if (l.mixer && StudioState.masterPlaying) l.mixer.update(delta);
+window.setGizmoMode = (m) => {
+    transformControl.setMode(m);
+    ['translate', 'rotate', 'scale'].forEach(k => {
+        const b = document.getElementById('gizmo-' + k);
+        if (b) b.classList.toggle('active', k === m);
     });
+};
 
-    evaluateSceneAtTime(StudioState.masterTime, false);
+window.setCameraPreset = (view) => {
+    camAnim = null;
+    orbit.target.set(0, 0, 0);
+    const presets = {
+        front: [0, 0, 1.6, 0, 1, 0],
+        perspective: [0.8, -1.1, 1.2, 0, 1, 0],
+        side: [1.6, 0, 0.15, 0, 1, 0],
+        top: [0, -1.6, 0.2, 0, 0, 1]
+    };
+    const p = presets[view] || presets.front;
+    camera.position.set(p[0], p[1], p[2]);
+    camera.up.set(p[3], p[4], p[5]);
+    orbit.update();
+};
 
-    const disp = document.getElementById('masterTimeDisplay');
-    if (StudioState.masterDuration > 0) {
-        disp.textContent = `${StudioState.masterTime.toFixed(2)}s / ${StudioState.masterDuration.toFixed(2)}s`;
-    } else {
-        disp.textContent = `0.00s / 0.00s (Static)`;
+window.focusSelectedLayer = () => {
+    const item = getPrimarySelectedItem();
+    if (!item || !item.mesh) {
+        camAnim = {
+            progress: 0, startPos: camera.position.clone(), startTarget: orbit.target.clone(),
+            endTarget: new THREE.Vector3(0, 0, 0), endPos: new THREE.Vector3(0, -0.9, 1.4)
+        };
+        return;
     }
+    const bounds = new THREE.Box3().setFromObject(item.mesh);
+    const center = bounds.getCenter(new THREE.Vector3());
+    const sz = bounds.getSize(new THREE.Vector3());
+    const dist = Math.max(sz.x, sz.y, sz.z, 0.4) * 1.65;
+    const offset = camera.position.clone().sub(orbit.target).normalize().multiplyScalar(dist);
+    camAnim = {
+        progress: 0, startPos: camera.position.clone(), startTarget: orbit.target.clone(),
+        endTarget: center, endPos: center.clone().add(offset)
+    };
+};
 
-    updateCameraAnimation();
-    renderer.render(scene, camera);
-}
+window.addEventListener('keydown', (ev) => {
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') {
+        ev.preventDefault();
+        return ev.shiftKey ? redo() : undo();
+    }
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'g') {
+        ev.preventDefault();
+        return groupSelectedLayers();
+    }
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
 
-initViewportEvents(handleLayerClick, groupSelectedLayers);
+    if (ev.code === 'Space' && !spaceHeld) {
+        ev.preventDefault();
+        spaceHeld = true;
+        container.classList.add('space-pan');
+        orbit.mouseButtons.LEFT = THREE.MOUSE.PAN;
+    }
+    const k = ev.key.toLowerCase();
+    if (k === 'w') setGizmoMode('translate');
+    if (k === 'e') setGizmoMode('rotate');
+    if (k === 'r') setGizmoMode('scale');
+    if (k === 'f') { ev.preventDefault(); focusSelectedLayer(); }
+});
+
+window.addEventListener('keyup', (ev) => {
+    if (ev.code === 'Space') {
+        spaceHeld = false;
+        container.classList.remove('space-pan');
+        orbit.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+    }
+});
+
+// Raycast Selection on Canvas
+const picker = new THREE.Raycaster();
+const ptr = new THREE.Vector2();
+let pStart = { x: 0, y: 0 };
+
+canvas.addEventListener('pointerdown', (e) => { pStart = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('pointerup', (e) => {
+    if (spaceHeld || Math.hypot(e.clientX - pStart.x, e.clientY - pStart.y) > 5) return;
+    const r = canvas.getBoundingClientRect();
+    ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    picker.setFromCamera(ptr, camera);
+    const targets = layers.filter(l => !l.isFolder && l.mesh && l.mesh.visible).map(l => l.mesh);
+    const hits = picker.intersectObjects(targets, true);
+    if (hits.length) {
+        let node = hits[0].object;
+        while (node.parent && !node.userData.layerId) node = node.parent;
+        if (node.userData.layerId) handleLayerClick(node.userData.layerId, e);
+    }
+});
+
+window.addEventListener('resize', () => {
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+});
+
+// Boot Nizhali Studio with 1 Default Print Target Slot
+addNewTargetSlot('image');
 animate();
-saveHistoryState();
