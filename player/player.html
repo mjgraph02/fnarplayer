@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Nizhali V7.4 — Universal AR Player</title>
+
+    <!-- Player Stylesheet -->
+    <link rel="stylesheet" href="./player.css?v=7.4">
+
+    <!-- Shared Vendor Libraries -->
+    <script src="../vendor/aframe.min.js"></script>
+    <script src="../vendor/crypto-js.min.js"></script>
+</head>
+<body>
+
+    <!-- 1. WHITE-LABEL BRANDED LOADING SCREEN (Customizable from Creator Studio) -->
+    <div id="brand-loader">
+        <div class="loader-card">
+            <img id="brand-logo" src="" alt="Brand Logo" style="display:none;">
+            <div class="loader-spinner" id="brand-spinner"></div>
+            <h2 id="brand-title">NIZHALI AR</h2>
+            <p id="brand-status">Initializing Experience...</p>
+            <div class="loader-bar-wrap">
+                <div class="loader-bar-fill" id="brand-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. MINIMALIST TOP HUD (Auto-dims during AR, never appears in recordings) -->
+    <header id="player-hud-top">
+        <div id="status-pill">📷 Scan Print</div>
+        <div class="hud-controls">
+            <button id="btn-light" class="hud-icon-btn active" title="Toggle Real-World Lighting">☀️</button>
+            <button id="btn-audio" class="hud-icon-btn" style="display:none;" title="Toggle Sound">🔇</button>
+        </div>
+    </header>
+
+    <!-- 3. SNAPCHAT-STYLE GESTURE RECORDER DOCK (Bottom Center) -->
+    <footer id="recorder-dock">
+        <div id="zoom-indicator">1.0x</div>
+        <div id="gesture-hint">Tap Photo • Hold Video • Slide ⬅️ Lock • ⬆️ Zoom</div>
+        <div class="shutter-row">
+            <div id="lock-target" class="lock-pill">🔒</div>
+            <div id="shutter-wrap">
+                <svg class="progress-ring" width="84" height="84">
+                    <circle class="progress-ring-bg" cx="42" cy="42" r="38"></circle>
+                    <circle class="progress-ring-fill" id="rec-ring-fill" cx="42" cy="42" r="38"></circle>
+                </svg>
+                <div id="shutter-btn"></div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 4. MEDIA PREVIEW & SHARE/SAVE MODAL -->
+    <div id="preview-modal" style="display:none;">
+        <div class="preview-card">
+            <div class="preview-media-box" id="preview-media-box"></div>
+            <div class="preview-actions">
+                <button id="btn-discard" class="p-btn p-btn-ghost">✕ Close</button>
+                <button id="btn-download" class="p-btn p-btn-primary">⬇️ Save</button>
+                <button id="btn-share" class="p-btn p-btn-accent" style="display:none;">📤 Share</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. MODULAR PLAYER ENGINE -->
+    <script src="./modules/1-shader-portal.js?v=7.4"></script>
+    <script src="./modules/2-lighting.js?v=7.4"></script>
+    <script src="./modules/3-recorder.js?v=7.4"></script>
+    <script type="module" src="./modules/4-player-core.js?v=7.4"></script>
+</body>
+</html>
