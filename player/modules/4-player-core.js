@@ -1,21 +1,8 @@
 // ============================================================================
-// PLAYER MODULE 04 // ZERO-LAG AR CORE, 60FPS CAMERA & SMOOTH LOSS FADE
+// PLAYER MODULE 04 // ZERO-LAG AR CORE, FAST CAMERA BOOT & SMOOTH LOSS FADE
 // ============================================================================
 
 import '../../vendor/mindar-image-aframe.prod.js';
-
-// 1. Lightweight 60fps Hardware Camera Stabilization Interceptor
-(function patchCameraStreamConstraints() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-    const origGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    navigator.mediaDevices.getUserMedia = function(constraints) {
-        if (constraints && constraints.video && typeof constraints.video === 'object') {
-            constraints.video.frameRate = constraints.video.frameRate || { ideal: 60, min: 30 };
-            constraints.video.resizeMode = 'none';
-        }
-        return origGetUserMedia(constraints);
-    };
-})();
 
 const statusPill = document.getElementById('status-pill');
 const topHud = document.getElementById('player-hud-top');
@@ -186,18 +173,17 @@ async function bootNizhaliPlayer() {
             return;
         }
 
-        // Initialize Real-World Auto-Lighting Engine with first target's default
         if (window.initLightingEngine) {
             window.initLightingEngine(targetsList[0].al ?? true);
         }
 
-        setLoaderProgress(50, 'Downloading Target Signature...');
+        setLoaderProgress(55, 'Loading AR Target...');
         const checkRes = await fetch(mindUrl);
         if (!checkRes.ok) throw new Error(`Target .mind error (${checkRes.status})`);
         const mindBuffer = await checkRes.arrayBuffer();
         const localMindBlobUrl = URL.createObjectURL(new Blob([mindBuffer]));
 
-        setLoaderProgress(80, 'Starting Stabilized Camera...');
+        setLoaderProgress(85, 'Starting Camera...');
 
         let allTargetsHtml = '';
         targetsList.forEach((tSlot, tIdx) => {
@@ -312,7 +298,6 @@ async function bootNizhaliPlayer() {
                     const img = new Image();
                     img.crossOrigin = 'anonymous';
                     img.onload = () => {
-                        // True-Color Linear Texture Pass-Through (No double-gamma darkening!)
                         const tex = new THREE.Texture(img);
                         tex.minFilter = THREE.LinearFilter;
                         tex.magFilter = THREE.LinearFilter;
@@ -328,7 +313,7 @@ async function bootNizhaliPlayer() {
                 }
             });
 
-            // Target Lock-On Event (Haptics + Per-Print Auto-Light Default + Smooth Fade Reset)
+            // Target Lock-On Event
             targetRootEl.addEventListener('targetFound', () => {
                 if (targetLossTimers[tIdx]) {
                     clearInterval(targetLossTimers[tIdx]);
@@ -337,10 +322,8 @@ async function bootNizhaliPlayer() {
                 window.NizhaliPlayer.targetFadeMultipliers[tIdx] = 1.0;
                 targetRootEl.object3D.visible = true;
 
-                // Tactile Micro-Haptic Pulse
                 if (navigator.vibrate) navigator.vibrate(40);
 
-                // Apply this print's default Real-World Lighting setting
                 if (tSlot.al !== undefined) {
                     window.NizhaliPlayer.autoLightEnabled = tSlot.al;
                     const btnLight = document.getElementById('btn-light');
@@ -348,8 +331,12 @@ async function bootNizhaliPlayer() {
                 }
 
                 activeTargetsCount++;
+                statusPill.style.opacity = '1';
                 statusPill.textContent = `🎯 ${tSlot.name}`;
                 topHud.classList.add('dimmed');
+                setTimeout(() => {
+                    if (activeTargetsCount > 0) statusPill.style.opacity = '0';
+                }, 1200);
 
                 const vids = allVideosByTarget[tIdx] || [];
                 vids.forEach(vid => {
@@ -369,7 +356,6 @@ async function bootNizhaliPlayer() {
                 const vids = allVideosByTarget[tIdx] || [];
 
                 if (tSlot.sf && (tSlot.ht ?? 0.35) > 0) {
-                    // Hold object3D visible briefly and smoothly fade opacity to 0
                     targetRootEl.object3D.visible = true;
                     const steps = 10;
                     const stepMs = ((tSlot.ht ?? 0.35) * 1000) / steps;
@@ -390,6 +376,7 @@ async function bootNizhaliPlayer() {
 
                 if (activeTargetsCount === 0) {
                     topHud.classList.remove('dimmed');
+                    statusPill.style.opacity = '1';
                     statusPill.textContent = '📷 Scan Print';
                 }
             });
@@ -397,8 +384,8 @@ async function bootNizhaliPlayer() {
 
         sceneEl.addEventListener('arReady', () => {
             setLoaderProgress(100, 'Ready!');
-            setTimeout(() => brandLoader.classList.add('loaded'), 250);
-            statusPill.textContent = `📷 Scan Print (${targetsList.length})`;
+            setTimeout(() => brandLoader.classList.add('loaded'), 200);
+            statusPill.textContent = '📷 Scan Print';
         });
 
     } catch (err) {

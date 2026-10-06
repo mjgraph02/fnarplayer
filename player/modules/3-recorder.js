@@ -6,12 +6,13 @@
     let isRecording = false;
     let isLocked = false;
     let pressTimer = null;
+    let isPressActive = false;
     let recordStartTime = 0;
     let progressAnimFrame = null;
     const MAX_RECORD_SEC = 30.0;
 
-    let touchStartY = 0;
-    let touchStartX = 0;
+    let startX = 0;
+    let startY = 0;
     let currentZoom = 1.0;
 
     let mediaRecorder = null;
@@ -21,6 +22,7 @@
     let compAnimFrame = null;
     let audioContext = null;
     let audioDest = null;
+    let connectedVideos = new WeakSet();
 
     const shutterWrap = document.getElementById('shutter-wrap');
     const shutterBtn = document.getElementById('shutter-btn');
@@ -35,67 +37,36 @@
     const btnDownload = document.getElementById('btn-download');
     const btnShare = document.getElementById('btn-share');
 
+    // Reliably locate the A-Frame WebGL canvas
     function getWebGlCanvas() {
         const sceneEl = document.getElementById('ar-scene');
-        return sceneEl ? sceneEl.canvas : document.querySelector('canvas');
+        if (sceneEl && sceneEl.canvas) return sceneEl.canvas;
+        if (sceneEl && sceneEl.renderer && sceneEl.renderer.domElement) return sceneEl.renderer.domElement;
+        return document.querySelector('canvas.a-canvas') || document.querySelector('canvas');
     }
 
+    // Reliably locate the live MindAR camera <video> feed
     function getCameraVideo() {
-        const vids = document.querySelectorAll('body > video');
-        for (let v of vids) {
-            if (v.srcObject || v.videoWidth > 0) return v;
+        const allVids = Array.from(document.querySelectorAll('video'));
+        // 1. Prefer any video with an active MediaStream (camera srcObject)
+        for (let v of allVids) {
+            if (v.srcObject) return v;
         }
-        return null;
+        // 2. Fallback: direct child of body or video without a remote http src
+        for (let v of allVids) {
+            if (!v.src || v.parentElement === document.body) return v;
+        }
+        return allVids[0] || null;
     }
 
-    // High-Res Single Snapshot
-    function capturePhoto() {
-        if (navigator.vibrate) navigator.vibrate(35);
-        const camVideo = getCameraVideo();
-        const glCanvas = getWebGlCanvas();
-        if (!camVideo || !glCanvas) return;
+    function drawCompositeFrame(ctx, w, h, camVideo, glCanvas) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, h);
 
-        const w = glCanvas.width || window.innerWidth;
-        const h = glCanvas.height || window.innerHeight;
-        const snapCanvas = document.createElement('canvas');
-        snapCanvas.width = w;
-        snapCanvas.height = h;
-        const snapCtx = snapCanvas.getContext('2d');
-
-        // Draw camera video with cover crop
-        const vAspect = (camVideo.videoWidth && camVideo.videoHeight) ? camVideo.videoWidth / camVideo.videoHeight : w / h;
-        const cAspect = w / h;
-        let dw = w, dh = h, dx = 0, dy = 0;
-        if (vAspect > cAspect) {
-            dw = h * vAspect;
-            dx = -(dw - w) / 2;
-        } else {
-            dh = w / vAspect;
-            dy = -(dh - h) / 2;
-        }
-        snapCtx.drawImage(camVideo, dx, dy, dw, dh);
-        snapCtx.drawImage(glCanvas, 0, 0, w, h);
-
-        snapCanvas.toBlob(blob => {
-            showPreview(blob, 'image');
-        }, 'image/jpeg', 0.95);
-    }
-
-    // 60fps Video Compositor Loop
-    function startCompositor(camVideo, glCanvas) {
-        if (!compCanvas) {
-            compCanvas = document.createElement('canvas');
-            compCtx = compCanvas.getContext('2d', { alpha: false });
-        }
-        compCanvas.width = glCanvas.width || window.innerWidth;
-        compCanvas.height = glCanvas.height || window.innerHeight;
-
-        const w = compCanvas.width;
-        const h = compCanvas.height;
-
-        function loop() {
-            if (!isRecording) return;
-            const vAspect = (camVideo.videoWidth && camVideo.videoHeight) ? camVideo.videoWidth / camVideo.videoHeight : w / h;
+        if (camVideo && camVideo.readyState >= 2) {
+            const vw = camVideo.videoWidth || w;
+            const vh = camVideo.videoHeight || h;
+            const vAspect = vw / vh;
             const cAspect = w / h;
             let dw = w, dh = h, dx = 0, dy = 0;
             if (vAspect > cAspect) {
@@ -105,8 +76,57 @@
                 dh = w / vAspect;
                 dy = -(dh - h) / 2;
             }
-            compCtx.drawImage(camVideo, dx, dy, dw, dh);
-            compCtx.drawImage(glCanvas, 0, 0, w, h);
+            ctx.drawImage(camVideo, dx, dy, dw, dh);
+        }
+
+        if (glCanvas) {
+            ctx.drawImage(glCanvas, 0, 0, w, h);
+        }
+    }
+
+    // High-Res Single Snapshot
+    function capturePhoto() {
+        if (navigator.vibrate) navigator.vibrate(35);
+        const camVideo = getCameraVideo();
+        const glCanvas = getWebGlCanvas();
+        if (!glCanvas && !camVideo) return;
+
+        // Visual flash feedback on shutter button
+        shutterBtn.style.transform = 'scale(0.82)';
+        setTimeout(() => { shutterBtn.style.transform = ''; }, 140);
+
+        const w = (glCanvas && glCanvas.width) ? glCanvas.width : window.innerWidth * (window.devicePixelRatio || 1);
+        const h = (glCanvas && glCanvas.height) ? glCanvas.height : window.innerHeight * (window.devicePixelRatio || 1);
+
+        const snapCanvas = document.createElement('canvas');
+        snapCanvas.width = w;
+        snapCanvas.height = h;
+        const snapCtx = snapCanvas.getContext('2d');
+
+        drawCompositeFrame(snapCtx, w, h, camVideo, glCanvas);
+
+        snapCanvas.toBlob(blob => {
+            if (blob) showPreview(blob, 'image');
+        }, 'image/jpeg', 0.95);
+    }
+
+    // 60fps Video Compositor Loop
+    function startCompositor(camVideo, glCanvas) {
+        if (!compCanvas) {
+            compCanvas = document.createElement('canvas');
+            compCtx = compCanvas.getContext('2d', { alpha: false });
+        }
+        // Keep recording resolution crisp & smooth on mobile (720p max width)
+        const aspect = window.innerHeight / window.innerWidth;
+        compCanvas.width = 720;
+        compCanvas.height = Math.round(720 * aspect);
+
+        const w = compCanvas.width;
+        const h = compCanvas.height;
+
+        function loop() {
+            if (!isRecording) return;
+            drawCompositeFrame(compCtx, w, h, camVideo, glCanvas);
             compAnimFrame = requestAnimationFrame(loop);
         }
         loop();
@@ -114,43 +134,59 @@
 
     function startVideoRecording() {
         if (isRecording) return;
-        isRecording = true;
-        recordedChunks = [];
-        if (navigator.vibrate) navigator.vibrate(60);
-
         const camVideo = getCameraVideo();
         const glCanvas = getWebGlCanvas();
-        if (!camVideo || !glCanvas) return;
+        if (!glCanvas && !camVideo) return;
+
+        isRecording = true;
+        recordedChunks = [];
+        if (navigator.vibrate) navigator.vibrate(55);
 
         startCompositor(camVideo, glCanvas);
-        const canvasStream = compCanvas.captureStream(60);
+        const canvasStream = compCanvas.captureStream(30);
 
-        // Capture live audio from layers
+        // Capture live audio from AR video layers if unmuted
         try {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             if (audioContext.state === 'suspended') audioContext.resume();
-            audioDest = audioContext.createMediaStreamDestination();
-            const mediaVids = document.querySelectorAll('video:not(body > video)');
-            mediaVids.forEach(v => {
-                try {
-                    const src = audioContext.createMediaElementSource(v);
-                    src.connect(audioDest);
-                    src.connect(audioContext.destination);
-                } catch(e) {}
+            if (!audioDest) audioDest = audioContext.createMediaStreamDestination();
+
+            const allVids = Array.from(document.querySelectorAll('video'));
+            allVids.forEach(v => {
+                if (v !== camVideo && !v.srcObject && !connectedVideos.has(v)) {
+                    try {
+                        const src = audioContext.createMediaElementSource(v);
+                        src.connect(audioDest);
+                        src.connect(audioContext.destination);
+                        connectedVideos.add(v);
+                    } catch (e) {}
+                }
             });
             const audioTracks = audioDest.stream.getAudioTracks();
             if (audioTracks.length > 0) canvasStream.addTrack(audioTracks[0]);
-        } catch(e) {}
+        } catch (e) {}
 
-        const mimeTypes = ['video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4'];
+        const mimeTypes = [
+            'video/mp4',
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=vp8,opus',
+            'video/webm'
+        ];
         let chosenMime = '';
-        for (let m of mimeTypes) {
-            if (MediaRecorder.isTypeSupported(m)) { chosenMime = m; break; }
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
+            for (let m of mimeTypes) {
+                if (MediaRecorder.isTypeSupported(m)) {
+                    chosenMime = m;
+                    break;
+                }
+            }
         }
 
         try {
-            mediaRecorder = new MediaRecorder(canvasStream, chosenMime ? { mimeType: chosenMime } : {});
-        } catch(err) {
+            mediaRecorder = chosenMime
+                ? new MediaRecorder(canvasStream, { mimeType: chosenMime, videoBitsPerSecond: 4500000 })
+                : new MediaRecorder(canvasStream);
+        } catch (err) {
             mediaRecorder = new MediaRecorder(canvasStream);
         }
 
@@ -160,11 +196,11 @@
 
         mediaRecorder.onstop = () => {
             cancelAnimationFrame(compAnimFrame);
-            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
-            showPreview(blob, 'video');
+            const blob = new Blob(recordedChunks, { type: (mediaRecorder && mediaRecorder.mimeType) || 'video/mp4' });
+            if (blob.size > 0) showPreview(blob, 'video');
         };
 
-        mediaRecorder.start(250);
+        mediaRecorder.start(200);
         recordStartTime = performance.now();
         shutterWrap.classList.add('recording');
         if (gestureHint) gestureHint.style.opacity = '0';
@@ -191,8 +227,9 @@
         if (!isRecording) return;
         isRecording = false;
         isLocked = false;
+        isPressActive = false;
         cancelAnimationFrame(progressAnimFrame);
-        if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+        if (navigator.vibrate) navigator.vibrate([35, 50, 35]);
 
         shutterWrap.classList.remove('recording');
         lockPill.classList.remove('active', 'locked');
@@ -202,59 +239,97 @@
         resetZoom();
 
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
+            try { mediaRecorder.stop(); } catch (e) {}
         }
     }
 
     function setZoom(val) {
         currentZoom = Math.min(2.5, Math.max(1.0, val));
-        const cam = document.querySelector('a-camera');
-        if (cam && cam.components.camera) {
-            cam.components.camera.camera.zoom = currentZoom;
-            cam.components.camera.camera.updateProjectionMatrix();
-        }
+        // Zoom both camera video and 3D AR scene smoothly together
+        const camVideo = getCameraVideo();
+        const glCanvas = getWebGlCanvas();
+        const scaleStr = currentZoom > 1.01 ? `scale(${currentZoom.toFixed(3)})` : '';
+        if (camVideo) camVideo.style.transform = scaleStr;
+        if (glCanvas) glCanvas.style.transform = scaleStr;
+
         zoomInd.textContent = `${currentZoom.toFixed(1)}x`;
         zoomInd.classList.add('visible');
     }
 
     function resetZoom() {
-        setZoom(1.0);
-        setTimeout(() => zoomInd.classList.remove('visible'), 600);
+        currentZoom = 1.0;
+        const camVideo = getCameraVideo();
+        const glCanvas = getWebGlCanvas();
+        if (camVideo) camVideo.style.transform = '';
+        if (glCanvas) glCanvas.style.transform = '';
+        zoomInd.textContent = '1.0x';
+        setTimeout(() => zoomInd.classList.remove('visible'), 500);
     }
 
-    // Touch & Pointer Gesture Engine
-    function onTouchStart(e) {
-        const touch = e.touches ? e.touches[0] : e;
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
+    // Unified Mobile Touch + Desktop Mouse Gesture Handlers
+    function getCoords(e) {
+        if (e.touches && e.touches.length > 0) {
+            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+        if (e.changedTouches && e.changedTouches.length > 0) {
+            return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+        }
+        return { x: e.clientX, y: e.clientY };
+    }
 
+    function handleDown(e) {
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+
+        // If already locked in hands-free recording, tapping stops recording!
+        if (isRecording && isLocked) {
+            stopVideoRecording();
+            return;
+        }
+
+        isPressActive = true;
+        const pt = getCoords(e);
+        startX = pt.x;
+        startY = pt.y;
+
+        clearTimeout(pressTimer);
         pressTimer = setTimeout(() => {
             pressTimer = null;
-            startVideoRecording();
-        }, 300);
+            if (isPressActive) {
+                startVideoRecording();
+            }
+        }, 260);
     }
 
-    function onTouchMove(e) {
-        if (!isRecording) return;
-        const touch = e.touches ? e.touches[0] : e;
-        const dx = touch.clientX - touchStartX;
-        const dy = touchStartY - touch.clientY; // positive = dragged upward
+    function handleMove(e) {
+        if (!isPressActive && !isRecording) return;
+        const pt = getCoords(e);
+        const dx = pt.x - startX;
+        const dy = startY - pt.y; // positive = finger slid UP
 
-        // Swipe Left to Lock Hands-Free
-        if (dx < -45 && !isLocked) {
-            isLocked = true;
-            lockPill.classList.add('locked');
-            if (navigator.vibrate) navigator.vibrate(30);
-        }
-
-        // Swipe Up/Down to Zoom
-        if (dy > 20) {
-            const zoomVal = 1.0 + (dy - 20) / 120;
-            setZoom(zoomVal);
+        if (isRecording) {
+            // Slide Left to Lock Hands-Free
+            if (dx < -45 && !isLocked) {
+                isLocked = true;
+                lockPill.classList.add('locked');
+                if (navigator.vibrate) navigator.vibrate(40);
+            }
+            // Slide Up/Down to Zoom
+            if (dy > 15) {
+                const zoomVal = 1.0 + (dy - 15) / 130;
+                setZoom(zoomVal);
+            } else if (dy <= 15 && currentZoom > 1.0) {
+                setZoom(1.0);
+            }
         }
     }
 
-    function onTouchEnd() {
+    function handleUp(e) {
+        if (!isPressActive) return;
+        if (e && e.cancelable) e.preventDefault();
+        isPressActive = false;
+
+        // Quick tap (< 260ms) -> Photo Snapshot
         if (pressTimer) {
             clearTimeout(pressTimer);
             pressTimer = null;
@@ -262,26 +337,22 @@
             return;
         }
 
+        // Released finger while recording (and not locked) -> Stop Video
         if (isRecording && !isLocked) {
             stopVideoRecording();
         }
     }
 
-    shutterBtn.addEventListener('pointerdown', onTouchStart);
-    window.addEventListener('pointermove', onTouchMove);
-    window.addEventListener('pointerup', () => {
-        if (isRecording && isLocked) {
-            // Tap locked button to stop
-            shutterBtn.onclick = () => {
-                stopVideoRecording();
-                shutterBtn.onclick = null;
-            };
-        } else {
-            onTouchEnd();
-        }
-    });
+    // Bind both Touch and Mouse events cleanly
+    shutterWrap.addEventListener('touchstart', handleDown, { passive: false });
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleUp, { passive: false });
 
-    // Preview, Share & Direct Download
+    shutterWrap.addEventListener('mousedown', handleDown);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+
+    // Preview, Share & Direct Download Modal
     function showPreview(blob, type) {
         previewBox.innerHTML = '';
         const url = URL.createObjectURL(blob);
@@ -297,6 +368,7 @@
             previewEl.loop = true;
             previewEl.controls = true;
             previewEl.playsInline = true;
+            previewEl.setAttribute('playsinline', '');
         }
         previewBox.appendChild(previewEl);
 
@@ -307,22 +379,27 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = filename;
+            document.body.appendChild(a);
             a.click();
+            a.remove();
         };
 
+        btnShare.style.display = 'none';
         if (navigator.share && navigator.canShare) {
-            const file = new File([blob], filename, { type: blob.type });
-            if (navigator.canShare({ files: [file] })) {
-                btnShare.style.display = 'block';
-                btnShare.onclick = async () => {
-                    try {
-                        await navigator.share({
-                            title: 'Nizhali AR Capture',
-                            files: [file]
-                        });
-                    } catch(e) {}
-                };
-            }
+            try {
+                const file = new File([blob], filename, { type: blob.type });
+                if (navigator.canShare({ files: [file] })) {
+                    btnShare.style.display = 'block';
+                    btnShare.onclick = async () => {
+                        try {
+                            await navigator.share({
+                                title: 'Nizhali AR Capture',
+                                files: [file]
+                            });
+                        } catch (e) {}
+                    };
+                }
+            } catch (e) {}
         }
 
         btnDiscard.onclick = () => {
