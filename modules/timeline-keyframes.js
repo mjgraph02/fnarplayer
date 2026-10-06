@@ -156,7 +156,26 @@ window.onParamEdit = function(p) {
     const el = document.getElementById(map[paramKey]);
     if (!el) return;
     const v = parseFloat(el.value) || 0;
-    setParamBaseValue(l, paramKey, v);
+
+    const isScaleParam = (paramKey === 'scaleX' || paramKey === 'scaleY' || paramKey === 'scaleZ');
+    const lockXYZ = document.getElementById('uniformScaleToggle')?.checked;
+
+    if (isScaleParam && lockXYZ) {
+        l.scale = [v, v, v];
+        document.getElementById('scaleX').value = v;
+        document.getElementById('scaleY').value = v;
+        document.getElementById('scaleZ').value = v;
+        ['scaleX', 'scaleY', 'scaleZ'].forEach(sp => {
+            if (autoKeyEnabled || (l.keyframes && l.keyframes[sp] && l.keyframes[sp].length > 0)) {
+                toggleParamKeyframe(sp);
+            }
+        });
+    } else {
+        setParamBaseValue(l, paramKey, v);
+        if (autoKeyEnabled || (l.keyframes && l.keyframes[paramKey] && l.keyframes[paramKey].length > 0)) {
+            toggleParamKeyframe(paramKey);
+        }
+    }
 
     if (paramKey === 'opacity') document.getElementById('opacityVal').textContent = v.toFixed(2);
     if (paramKey === 'animSpeed') document.getElementById('animSpeedVal').textContent = v;
@@ -164,9 +183,6 @@ window.onParamEdit = function(p) {
     if (paramKey === 'similarity') document.getElementById('simVal').textContent = v;
     if (paramKey === 'smoothness') document.getElementById('smoothVal').textContent = v;
 
-    if (autoKeyEnabled || (l.keyframes && l.keyframes[paramKey] && l.keyframes[paramKey].length > 0)) {
-        toggleParamKeyframe(paramKey);
-    }
     if (window.applyTransformAndEffectsImmediate) applyTransformAndEffectsImmediate(l);
     if (window.renderLayerList) renderLayerList();
 };

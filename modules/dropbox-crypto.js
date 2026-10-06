@@ -1,5 +1,5 @@
 // ============================================================================
-// MODULE 05 // UNDO/REDO HISTORY, PROJECT.JSON SAVE/LOAD & CLIENT LINK EXPORT
+// MODULE 05 // UNDO/REDO HISTORY, PROJECT.JSON SAVE/LOAD & MULTI-TARGET EXPORT
 // ============================================================================
 
 let undoStack = [];
@@ -35,7 +35,7 @@ window.redo = function() {
 
 function buildProjectPayload() {
     return {
-        version: '7.2',
+        version: '7.3',
         mindUrl: projectState.mindUrl || document.getElementById('mindUrlInput').value.trim(),
         activeTargetIndex: projectState.activeTargetIndex,
         targetIndexMap: projectState.targetIndexMap || [],
@@ -146,6 +146,30 @@ window.handleProjectJsonUpload = function(ev) {
     reader.readAsText(f);
 };
 
+// Compute effective local-target transform for a layer (even if inside a folder or on an inactive tab)
+function computeLayerExportTransform(l, slotLayers) {
+    if (!l.parentId) {
+        return {
+            p: [+l.pos[0].toFixed(3), +l.pos[1].toFixed(3), +l.pos[2].toFixed(3)],
+            s: [+l.scale[0].toFixed(3), +l.scale[1].toFixed(3), +l.scale[2].toFixed(3)],
+            r: [+l.rot[0].toFixed(1), +l.rot[1].toFixed(1), +l.rot[2].toFixed(1)]
+        };
+    }
+    const pf = slotLayers.find(f => f.id === l.parentId && f.isFolder);
+    if (!pf) {
+        return {
+            p: [+l.pos[0].toFixed(3), +l.pos[1].toFixed(3), +l.pos[2].toFixed(3)],
+            s: [+l.scale[0].toFixed(3), +l.scale[1].toFixed(3), +l.scale[2].toFixed(3)],
+            r: [+l.rot[0].toFixed(1), +l.rot[1].toFixed(1), +l.rot[2].toFixed(1)]
+        };
+    }
+    return {
+        p: [+(pf.pos[0] + l.pos[0]).toFixed(3), +(pf.pos[1] + l.pos[1]).toFixed(3), +(pf.pos[2] + l.pos[2]).toFixed(3)],
+        s: [+(pf.scale[0] * l.scale[0]).toFixed(3), +(pf.scale[1] * l.scale[1]).toFixed(3), +(pf.scale[2] * l.scale[2]).toFixed(3)],
+        r: [+(pf.rot[0] + l.rot[0]).toFixed(1), +(pf.rot[1] + l.rot[1]).toFixed(1), +(pf.rot[2] + l.rot[2]).toFixed(1)]
+    };
+}
+
 window.exportProject = function() {
     const projUrl = document.getElementById('projectJsonUrlInput').value.trim();
     const base = window.location.origin + window.location.pathname.replace('creator.html', '');
@@ -154,53 +178,61 @@ window.exportProject = function() {
     if (projUrl) {
         finalLink = `${base}?project=${encodeURIComponent(projUrl)}`;
     } else {
-        const slot = getActiveTargetSlot();
         const mind = projectState.mindUrl || document.getElementById('mindUrlInput').value.trim();
-        const mediaLayers = layers.filter(l => !l.isFolder && !l.isMaskPlane);
+        const customDur = parseFloat(document.getElementById('customDurationInput').value) || 5.0;
 
-        const exportedMasks = layers.filter(l => l.isMaskPlane).map(m => {
-            m.mesh.updateMatrixWorld(true);
-            const wp = new THREE.Vector3(), wq = new THREE.Quaternion(), ws = new THREE.Vector3();
-            m.mesh.matrixWorld.decompose(wp, wq, ws);
-            const we = new THREE.Euler().setFromQuaternion(wq);
-            return {
-                id: m.id,
-                p: [+wp.x.toFixed(3), +wp.y.toFixed(3), +wp.z.toFixed(3)],
-                s: [+ws.x.toFixed(3), +ws.y.toFixed(3), +ws.z.toFixed(3)],
-                r: [+THREE.MathUtils.radToDeg(we.x).toFixed(1), +THREE.MathUtils.radToDeg(we.y).toFixed(1), +THREE.MathUtils.radToDeg(we.z).toFixed(1)]
-            };
-        });
+        // Export ALL target slots in order so Multi-Target (Print 1, Print 2, etc.) works 100%!
+        const exportedTargets = projectState.targets.map((slot, tIdx) => {
+            const slotLayers = slot.layers || [];
+            const masks = slotLayers.filter(l => l.isMaskPlane).map(m => {
+                const tr = computeLayerExportTransform(m, slotLayers);
+                return { id: m.id, p: tr.p, s: tr.s, r: tr.r };
+            });
 
-        const exportedLayers = mediaLayers.map(l => {
-            l.mesh.updateMatrixWorld(true);
-            const wp = new THREE.Vector3(), wq = new THREE.Quaternion(), ws = new THREE.Vector3();
-            l.mesh.matrixWorld.decompose(wp, wq, ws);
-            const we = new THREE.Euler().setFromQuaternion(wq);
+            let slotMaxDur = 0;
+            let slotHasAnim = false;
+            slotLayers.forEach(l => {
+                if (l.duration && l.duration > slotMaxDur) slotMaxDur = l.duration;
+                if (l.animPreset && l.animPreset !== 'none') slotHasAnim = true;
+                if (l.keyframes && Object.values(l.keyframes).some(arr => arr && arr.length > 0)) slotHasAnim = true;
+            });
+            const slotDur = slotMaxDur > 0 ? +slotMaxDur.toFixed(2) : (slotHasAnim ? customDur : 0);
+
+            const mediaLayers = slotLayers.filter(l => !l.isFolder && !l.isMaskPlane).map(l => {
+                const tr = computeLayerExportTransform(l, slotLayers);
+                return {
+                    t: l.chromaEnabled ? 'chroma' : l.type,
+                    u: l.url,
+                    p: tr.p,
+                    s: tr.s,
+                    r: tr.r,
+                    op: l.opacity ?? 1.0,
+                    cs: l.clipSource || 'none',
+                    c: l.color,
+                    sim: l.similarity,
+                    sm: l.smoothness,
+                    ap: l.animPreset || 'none',
+                    as: l.animSpeed ?? 1.0,
+                    aa: l.animAmp ?? 1.0,
+                    kf: l.keyframes || {}
+                };
+            });
+
             return {
-                t: l.chromaEnabled ? 'chroma' : l.type,
-                u: l.url,
-                p: [+wp.x.toFixed(3), +wp.y.toFixed(3), +wp.z.toFixed(3)],
-                s: [+ws.x.toFixed(3), +ws.y.toFixed(3), +ws.z.toFixed(3)],
-                r: [+THREE.MathUtils.radToDeg(we.x).toFixed(1), +THREE.MathUtils.radToDeg(we.y).toFixed(1), +THREE.MathUtils.radToDeg(we.z).toFixed(1)],
-                op: l.opacity ?? 1.0,
-                cs: l.clipSource || 'none',
-                c: l.color,
-                sim: l.similarity,
-                sm: l.smoothness,
-                ap: l.animPreset || 'none',
-                as: l.animSpeed ?? 1.0,
-                aa: l.animAmp ?? 1.0,
-                kf: l.keyframes || {}
+                idx: tIdx,
+                name: slot.name,
+                mode: slot.mode || 'image',
+                ta: slot.targetAspect || 1.0,
+                dur: slotDur,
+                masks: masks,
+                l: mediaLayers
             };
         });
 
         const sceneObj = {
-            v: 7,
+            v: 7.3,
             m: mind,
-            ta: slot ? slot.targetAspect : 1.0,
-            dur: masterDuration,
-            masks: exportedMasks,
-            l: exportedLayers
+            targets: exportedTargets
         };
         const b64 = btoa(encodeURIComponent(JSON.stringify(sceneObj)));
         finalLink = `${base}?scene=${encodeURIComponent(b64)}`;
@@ -208,6 +240,6 @@ window.exportProject = function() {
 
     const box = document.getElementById('export-box');
     box.style.display = 'block';
-    box.innerHTML = `<b>V7 CLIENT LINK:</b><br><a href="${finalLink}" target="_blank" style="color:var(--te-green);">${finalLink}</a>`;
-    showToast('⚡ Permanent V7 Link Ready!');
+    box.innerHTML = `<b>V7.3 MULTI-TARGET LINK:</b><br><a href="${finalLink}" target="_blank" style="color:var(--te-green);">${finalLink}</a>`;
+    showToast(`⚡ Exported ${projectState.targets.length} Target(s) to V7.3 Link!`);
 };

@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NIZHALI V7.2 // FIELD AR WORKSTATION</title>
+    <title>NIZHALI V7.3 // FIELD AR WORKSTATION</title>
 
-    <!-- Modular Stylesheet (Cache-busted v7.2) -->
-    <link rel="stylesheet" href="./studio.css?v=7.2">
+    <!-- Modular Stylesheet -->
+    <link rel="stylesheet" href="./studio.css?v=7.3">
 
     <!-- Three.js + OrbitControls + TransformControls + GLTFLoader -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -24,11 +24,11 @@
     <header id="top-hardware-bar">
         <div class="brand-cluster">
             <div class="led-dot"></div>
-            <span class="brand-name">NIZHALI // OP-V7.2</span>
+            <span class="brand-name">NIZHALI // OP-V7.3</span>
             <span class="spec-tag">FIELD STUDIO</span>
         </div>
 
-        <!-- Multi-Target Tabs (Switch between multiple images/toys/face filters inside 1 Client Project!) -->
+        <!-- Multi-Target Tabs -->
         <div id="target-tabs-bar"></div>
 
         <div class="project-actions">
@@ -49,7 +49,6 @@
             <span id="activeTargetBadge" class="spec-tag">PRINT</span>
         </div>
 
-        <!-- Target Configuration Box (Adapts dynamically to Print, 3D Toy .glb, or Face AR!) -->
         <div class="hw-card">
             <label>Target Slot Name</label>
             <input type="text" id="targetSlotName" oninput="renameActiveTarget(this.value)">
@@ -61,7 +60,7 @@
                 <input type="text" id="targetImgUrlInput" placeholder="https://www.dropbox.com/.../print.jpg" oninput="loadTargetFromUrl()">
             </div>
 
-            <!-- B: 3D TOY PHOTOGRAMMETRY (.GLB) TARGET CONTROLS (Zoro Use Case!) -->
+            <!-- B: 3D TOY PHOTOGRAMMETRY (.GLB) TARGET CONTROLS -->
             <div id="targetModeToyBox" style="display:none;">
                 <label style="color:var(--te-yellow);">Upload 3D Toy Scan (.glb) OR Paste Link</label>
                 <input type="file" id="toyGlbInput" accept=".glb,.gltf" style="font-size:10px; width:100%; margin-bottom:4px;" onchange="loadToyTargetGlbFile(event)">
@@ -75,7 +74,7 @@
                 </small>
             </div>
 
-            <!-- C: FACE TRACKING CONTROLS (Jewelry, Glasses, Makeup) -->
+            <!-- C: FACE TRACKING CONTROLS -->
             <div id="targetModeFaceBox" style="display:none;">
                 <label style="color:var(--te-cyan);">Face AR Anchor Point for Selected Layer</label>
                 <select id="faceAnchorSelect" onchange="syncFaceAnchor()">
@@ -92,7 +91,6 @@
                 </label>
             </div>
 
-            <!-- Built-in Multi-Target & 3D Toy Turntable .mind Compiler -->
             <button class="btn btn-orange" id="compileMindBtn" style="margin-top:8px;" onclick="compileProjectMindFile()">
                 ⚙️ Compile Project targets.mind
             </button>
@@ -184,11 +182,17 @@
                 </div>
             </div>
 
-            <!-- TRANSFORMS -->
+            <!-- TRANSFORMS + UNIFORM XYZ SCALE LOCK -->
             <div class="hw-card">
                 <div class="module-header" style="margin-top:0;">
                     <span>3D COORDINATES</span>
-                    <button class="kf-btn" onclick="addKeyframeForGroup('transform')">◆ KEY ALL</button>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <label style="margin:0; cursor:pointer; color:var(--te-yellow); font-size:9px; display:flex; align-items:center; gap:3px;" title="Lock X, Y, Z Scale Together">
+                            <input type="checkbox" id="uniformScaleToggle" checked style="width:12px; height:12px; accent-color:var(--te-orange);">
+                            🔗 LOCK XYZ
+                        </label>
+                        <button class="kf-btn" onclick="addKeyframeForGroup('transform')">◆ KEY ALL</button>
+                    </div>
                 </div>
                 <div class="row-3">
                     <div><label><span>POS X</span><button class="kf-btn" id="kf-posX" onclick="toggleParamKeyframe('posX')">◆</button></label><input type="number" id="posX" step="0.02" value="0" oninput="onParamEdit('posX')"></div>
@@ -250,7 +254,7 @@
 
                 <div id="chromaEffectSection" style="border-top:1.5px solid var(--line-subtle); margin-top:8px; padding-top:6px;">
                     <label class="toggle-row">
-                        <span>🟩 CHROMA KEY GREEN/BLUE</span>
+                        <span>🎨 CHROMA KEY (ANY COLOR)</span>
                         <input type="checkbox" id="chromaToggle" onchange="syncEffectsFromInputs(); saveHistoryState();">
                     </label>
                     <div id="chromaParamsBox" style="display:none; margin-top:4px;">
@@ -294,12 +298,12 @@
         <div id="keyframeTrack" title="Click diamond to jump, Right-Click diamond to delete"></div>
     </footer>
 
-    <!-- 6 Modular Engine Scripts (Standard Script Scope - Zero ES6 Import Bugs, Cache-Busted v7.2) -->
-    <script src="./modules/core-viewport.js?v=7.2"></script>
-    <script src="./modules/tracker-3d-epnp.js?v=7.2"></script>
-    <script src="./modules/portal-clipping.js?v=7.2"></script>
-    <script src="./modules/timeline-keyframes.js?v=7.2"></script>
-    <script src="./modules/dropbox-crypto.js?v=7.2"></script>
-    <script src="./modules/studio-main.js?v=7.2"></script>
+    <!-- 6 Modular Engine Scripts (v7.3) -->
+    <script src="./modules/core-viewport.js?v=7.3"></script>
+    <script src="./modules/tracker-3d-epnp.js?v=7.3"></script>
+    <script src="./modules/portal-clipping.js?v=7.3"></script>
+    <script src="./modules/timeline-keyframes.js?v=7.3"></script>
+    <script src="./modules/dropbox-crypto.js?v=7.3"></script>
+    <script src="./modules/studio-main.js?v=7.3"></script>
 </body>
 </html>

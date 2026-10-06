@@ -3,95 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Nizhali V7.2 — Universal AR Player</title>
+    <title>Nizhali V7.3 — Universal Multi-Target AR Player</title>
 
     <!-- Load A-Frame & CryptoJS from ./vendor/ -->
     <script src="./vendor/aframe.min.js"></script>
     <script src="./vendor/crypto-js.min.js"></script>
 
     <script>
-        // 1. Universal Chroma Key + 4-Plane 3D Portal/Mask Clipping Shader (Works at both +Z and -Z!)
-        AFRAME.registerShader('nizhali-surface', {
-            schema: {
-                src: { type: 'map', is: 'uniform' },
-                color: { type: 'color', default: '#00ff00', is: 'uniform' },
-                similarity: { type: 'number', default: 0.38, is: 'uniform' },
-                smoothness: { type: 'number', default: 0.08, is: 'uniform' },
-                enableChroma: { type: 'number', default: 0.0, is: 'uniform' },
-                opacity: { type: 'number', default: 1.0, is: 'uniform' },
-                useClip: { type: 'number', default: 0.0, is: 'uniform' },
-                clipP0: { type: 'vec4', is: 'uniform' },
-                clipP1: { type: 'vec4', is: 'uniform' },
-                clipP2: { type: 'vec4', is: 'uniform' },
-                clipP3: { type: 'vec4', is: 'uniform' }
-            },
-            vertexShader: `
-                varying vec2 vUv;
-                varying vec3 vWorldPos;
-                void main() {
-                    vUv = uv;
-                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-                    vWorldPos = worldPosition.xyz;
-                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
-                }
-            `,
-            fragmentShader: `
-                #ifdef GL_FRAGMENT_PRECISION_HIGH
-                precision highp float;
-                #else
-                precision mediump float;
-                #endif
-                uniform sampler2D src;
-                uniform vec3 color;
-                uniform float similarity;
-                uniform float smoothness;
-                uniform float enableChroma;
-                uniform float opacity;
-                uniform float useClip;
-                uniform vec4 clipP0;
-                uniform vec4 clipP1;
-                uniform vec4 clipP2;
-                uniform vec4 clipP3;
-                varying vec2 vUv;
-                varying vec3 vWorldPos;
-                void main() {
-                    if (useClip > 0.5) {
-                        if (dot(vWorldPos, clipP0.xyz) + clipP0.w < 0.0) discard;
-                        if (dot(vWorldPos, clipP1.xyz) + clipP1.w < 0.0) discard;
-                        if (dot(vWorldPos, clipP2.xyz) + clipP2.w < 0.0) discard;
-                        if (dot(vWorldPos, clipP3.xyz) + clipP3.w < 0.0) discard;
+        // 1. Create custom Three.js ShaderMaterial directly on each layer (eliminates A-Frame black texture bugs!)
+        function createNizhaliShaderMaterial(tex, cfg) {
+            const THREE = AFRAME.THREE;
+            const isChroma = (cfg.t === 'chroma');
+            return new THREE.ShaderMaterial({
+                transparent: true,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+                uniforms: {
+                    src: { value: tex },
+                    hasTex: { value: tex ? 1.0 : 0.0 },
+                    color: { value: new THREE.Color(cfg.c || '#00ff00') },
+                    similarity: { value: cfg.sim ?? 0.38 },
+                    smoothness: { value: cfg.sm ?? 0.08 },
+                    enableChroma: { value: isChroma ? 1.0 : 0.0 },
+                    opacity: { value: cfg.op ?? 1.0 },
+                    useClip: { value: 0.0 },
+                    invRefMat: { value: new THREE.Matrix4() },
+                    halfBounds: { value: new THREE.Vector2(0.5, 0.5) }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    varying vec3 vWorldPos;
+                    void main() {
+                        vUv = uv;
+                        vec4 wp = modelMatrix * vec4(position, 1.0);
+                        vWorldPos = wp.xyz;
+                        gl_Position = projectionMatrix * viewMatrix * wp;
                     }
-                    vec4 texColor = texture2D(src, vUv);
-                    if (enableChroma > 0.5) {
-                        float Y1 = 0.2989 * texColor.r + 0.5866 * texColor.g + 0.1145 * texColor.b;
-                        float Cr1 = texColor.r - Y1;
-                        float Cb1 = texColor.b - Y1;
-                        float Y2 = 0.2989 * color.r + 0.5866 * color.g + 0.1145 * color.b;
-                        float Cr2 = color.r - Y2;
-                        float Cb2 = color.b - Y2;
-                        float dist = distance(vec2(Cr1, Cb1), vec2(Cr2, Cb2));
-                        float blend = smoothstep(similarity, similarity + max(smoothness, 0.001), dist);
-                        if (blend * opacity < 0.01) discard;
-                        gl_FragColor = vec4(texColor.rgb * blend, texColor.a * blend * opacity);
-                    } else {
-                        if (texColor.a * opacity < 0.01) discard;
-                        gl_FragColor = vec4(texColor.rgb, texColor.a * opacity);
+                `,
+                fragmentShader: `
+                    #ifdef GL_FRAGMENT_PRECISION_HIGH
+                    precision highp float;
+                    #else
+                    precision mediump float;
+                    #endif
+                    uniform sampler2D src;
+                    uniform float hasTex;
+                    uniform vec3 color;
+                    uniform float similarity;
+                    uniform float smoothness;
+                    uniform float enableChroma;
+                    uniform float opacity;
+                    uniform float useClip;
+                    uniform mat4 invRefMat;
+                    uniform vec2 halfBounds;
+                    varying vec2 vUv;
+                    varying vec3 vWorldPos;
+                    void main() {
+                        if (hasTex < 0.5) discard;
+                        if (useClip > 0.5) {
+                            vec4 localPos = invRefMat * vec4(vWorldPos, 1.0);
+                            if (abs(localPos.x) > halfBounds.x || abs(localPos.y) > halfBounds.y) discard;
+                        }
+                        vec4 texColor = texture2D(src, vUv);
+                        if (enableChroma > 0.5) {
+                            float Y1 = 0.2989 * texColor.r + 0.5866 * texColor.g + 0.1145 * texColor.b;
+                            float Y2 = 0.2989 * color.r + 0.5866 * color.g + 0.1145 * color.b;
+                            float d = distance(vec2(texColor.r - Y1, texColor.b - Y1), vec2(color.r - Y2, color.b - Y2));
+                            float b = smoothstep(similarity, similarity + max(smoothness, 0.001), d);
+                            if (b * opacity < 0.01) discard;
+                            gl_FragColor = vec4(texColor.rgb * b, texColor.a * b * opacity);
+                        } else {
+                            if (texColor.a * opacity < 0.01) discard;
+                            gl_FragColor = vec4(texColor.rgb, texColor.a * opacity);
+                        }
                     }
-                }
-            `
-        });
+                `
+            });
+        }
 
-        // 2. Per-Layer Keyframe + Preset Animation + 3D Mask Clipping Controller
+        // 2. Build a 3D Portal Depth-Mask Frame at Z=0 so -Z layers look like a real window inside the print!
+        function createPortalWindowFrame(halfW, halfH) {
+            const THREE = AFRAME.THREE;
+            const group = new THREE.Group();
+
+            // Invisible Depth Occluder Ring around the outside of the print/mask window (at Z = 0)
+            // Any pixel of a -Z layer that slides behind this outer ring when tilting the phone is hidden!
+            const outerShape = new THREE.Shape();
+            const pad = 4.0;
+            outerShape.moveTo(-pad, -pad);
+            outerShape.lineTo( pad, -pad);
+            outerShape.lineTo( pad,  pad);
+            outerShape.lineTo(-pad,  pad);
+            outerShape.closePath();
+
+            const holePath = new THREE.Path();
+            holePath.moveTo(-halfW, -halfH);
+            holePath.lineTo( halfW, -halfH);
+            holePath.lineTo( halfW,  halfH);
+            holePath.lineTo(-halfW,  halfH);
+            holePath.closePath();
+            outerShape.holes.push(holePath);
+
+            const ringGeo = new THREE.ShapeGeometry(outerShape);
+            const occluderMat = new THREE.MeshBasicMaterial({
+                colorWrite: false,
+                depthWrite: true,
+                side: THREE.DoubleSide
+            });
+            const ringMesh = new THREE.Mesh(ringGeo, occluderMat);
+            ringMesh.renderOrder = -1;
+            group.add(ringMesh);
+
+            return group;
+        }
+
+        // 3. Per-Layer Keyframe + Preset Animation + Target-Local Clipping Controller
         AFRAME.registerComponent('nizhali-layer', {
             schema: {
                 configJson: { type: 'string', default: '{}' },
+                targetIndex: { type: 'number', default: 0 },
                 targetAspect: { type: 'number', default: 1.0 },
                 masterDuration: { type: 'number', default: 0.0 }
             },
             init: function() {
+                const THREE = AFRAME.THREE;
                 this.cfg = JSON.parse(decodeURIComponent(this.data.configJson));
                 this.startTime = performance.now();
+                this.invRefMat = new THREE.Matrix4();
                 this.el.sceneEl.renderer.localClippingEnabled = true;
+
+                // Ensure layer renders after the portal occluder ring (renderOrder >= 1)
+                this.el.object3D.renderOrder = 1 + (this.cfg.p ? Math.round((this.cfg.p[2] + 2) * 10) : 1);
             },
             evalKf: function(param, baseVal, t) {
                 const kfs = this.cfg.kf && this.cfg.kf[param];
@@ -107,34 +149,6 @@
                     }
                 }
                 return baseVal;
-            },
-            computeClipPlanes: function() {
-                const cs = this.cfg.cs;
-                if (!cs || cs === 'none') return null;
-                const THREE = AFRAME.THREE;
-                const targetRoot = document.getElementById('target-root');
-                if (!targetRoot) return null;
-
-                let refObj = targetRoot.object3D;
-                let halfW = 0.5;
-                let halfH = this.data.targetAspect / 2;
-
-                if (cs !== 'target') {
-                    const maskEl = document.getElementById('mask-' + cs);
-                    if (!maskEl) return null;
-                    refObj = maskEl.object3D;
-                    halfW = 0.5;
-                    halfH = 0.5;
-                }
-
-                refObj.updateMatrixWorld(true);
-                const m = refObj.matrixWorld;
-                return [
-                    new THREE.Plane(new THREE.Vector3( 1,  0, 0), halfW).applyMatrix4(m),
-                    new THREE.Plane(new THREE.Vector3(-1,  0, 0), halfW).applyMatrix4(m),
-                    new THREE.Plane(new THREE.Vector3( 0,  1, 0), halfH).applyMatrix4(m),
-                    new THREE.Plane(new THREE.Vector3( 0, -1, 0), halfH).applyMatrix4(m)
-                ];
             },
             tick: function(time) {
                 const THREE = AFRAME.THREE;
@@ -187,25 +201,46 @@
                     THREE.MathUtils.degToRad(rz)
                 );
 
-                const planes = this.computeClipPlanes();
+                // Compute Target-Local Clipping Bounds (if layer is unclipped or at Z >= 0)
+                // Note: If layer is behind the print (pz < -0.005) and clipped, the 3D Portal Occluder Ring at Z=0
+                // handles true 3D window perspective clipping! For Z >= 0 layers, local X/Y bounds clip it cleanly.
+                const cs = c.cs;
+                let useLocalClip = false;
+                let halfW = 0.5;
+                let halfH = this.data.targetAspect / 2;
+
+                if (cs && cs !== 'none') {
+                    const tIdx = this.data.targetIndex;
+                    let refEl = document.getElementById(`target-root-${tIdx}`);
+                    if (cs !== 'target') {
+                        const maskEl = document.getElementById(`mask-${tIdx}-${cs}`);
+                        if (maskEl) {
+                            refEl = maskEl;
+                            halfW = 0.5;
+                            halfH = 0.5;
+                        }
+                    }
+                    if (refEl && refEl.object3D) {
+                        refEl.object3D.updateMatrixWorld(true);
+                        this.invRefMat.copy(refEl.object3D.matrixWorld).invert();
+                        // If layer is at Z >= -0.01, clip strictly in X/Y; if deep behind Z < -0.01, let the Z=0 Portal Window Occluder clip it in 3D perspective!
+                        useLocalClip = (pz >= -0.01);
+                    }
+                }
+
                 obj.traverse(child => {
                     if (child.isMesh && child.material) {
-                        child.material.clippingPlanes = planes;
-                        child.material.transparent = true;
                         if (child.material.uniforms && child.material.uniforms.opacity) {
                             child.material.uniforms.opacity.value = op;
                             child.material.uniforms.similarity.value = sim;
                             child.material.uniforms.smoothness.value = sm;
-                            if (planes) {
-                                child.material.uniforms.useClip.value = 1.0;
-                                child.material.uniforms.clipP0.value.set(planes[0].normal.x, planes[0].normal.y, planes[0].normal.z, planes[0].constant);
-                                child.material.uniforms.clipP1.value.set(planes[1].normal.x, planes[1].normal.y, planes[1].normal.z, planes[1].constant);
-                                child.material.uniforms.clipP2.value.set(planes[2].normal.x, planes[2].normal.y, planes[2].normal.z, planes[2].constant);
-                                child.material.uniforms.clipP3.value.set(planes[3].normal.x, planes[3].normal.y, planes[3].normal.z, planes[3].constant);
-                            } else {
-                                child.material.uniforms.useClip.value = 0.0;
+                            child.material.uniforms.useClip.value = useLocalClip ? 1.0 : 0.0;
+                            if (useLocalClip) {
+                                child.material.uniforms.invRefMat.value.copy(this.invRefMat);
+                                child.material.uniforms.halfBounds.value.set(halfW, halfH);
                             }
                         } else {
+                            child.material.transparent = true;
                             child.material.opacity = op;
                         }
                     }
@@ -252,18 +287,17 @@
 </head>
 <body>
 
-    <div id="status">Initializing Nizhali V7.2...</div>
+    <div id="status">Initializing Nizhali V7.3...</div>
     <button id="unmute-btn">🔇 Tap for Sound</button>
 
     <script type="module">
-        // Load MindAR from ./vendor/
         import './vendor/mindar-image-aframe.prod.js';
 
         const statusEl = document.getElementById('status');
         const unmuteBtn = document.getElementById('unmute-btn');
-        let videoElements = [];
+        let allVideosByTarget = {}; // { 0: [vid, ...], 1: [vid, ...] }
         let isMuted = true;
-        let activeTargetFound = false;
+        let activeTargetsCount = 0;
 
         function cleanStorageUrl(url) {
             if (!url) return '';
@@ -276,53 +310,56 @@
             return clean;
         }
 
-        // Convert full project.json format into normalized scene config if needed
-        function normalizeProjectToScene(projData) {
-            const firstTarget = (projData.targets && projData.targets[0]) || {};
-            const rawLayers = firstTarget.layers || [];
-            const masks = rawLayers.filter(l => l.isMaskPlane).map(m => ({
-                id: m.id, p: m.pos || [0,0,0], s: m.scale || [1,1,1], r: m.rot || [0,0,0]
-            }));
-            const mediaLayers = rawLayers.filter(l => !l.isFolder && !l.isMaskPlane).map(l => ({
-                t: l.chromaEnabled ? 'chroma' : (l.type || 'video'),
-                u: cleanStorageUrl(l.url),
-                p: l.pos || [0,0,0],
-                s: l.scale || [1,1,1],
-                r: l.rot || [0,0,0],
-                op: l.opacity ?? 1.0,
-                cs: l.clipSource || 'none',
-                c: l.color || '#00ff00',
-                sim: l.similarity ?? 0.38,
-                sm: l.smoothness ?? 0.08,
-                ap: l.animPreset || 'none',
-                as: l.animSpeed ?? 1.0,
-                aa: l.animAmp ?? 1.0,
-                kf: l.keyframes || {}
-            }));
+        // Convert full project.json into normalized multi-target array
+        function normalizeProjectJson(projData) {
+            const rawTargets = projData.targets || [];
+            const targets = rawTargets.map((t, idx) => {
+                const rawLayers = t.layers || [];
+                const masks = rawLayers.filter(l => l.isMaskPlane).map(m => ({
+                    id: m.id, p: m.pos || [0,0,0], s: m.scale || [1,1,1], r: m.rot || [0,0,0]
+                }));
+                const mediaLayers = rawLayers.filter(l => !l.isFolder && !l.isMaskPlane).map(l => ({
+                    t: l.chromaEnabled ? 'chroma' : (l.type || 'video'),
+                    u: cleanStorageUrl(l.url),
+                    p: l.pos || [0,0,0],
+                    s: l.scale || [1,1,1],
+                    r: l.rot || [0,0,0],
+                    op: l.opacity ?? 1.0,
+                    cs: l.clipSource || 'none',
+                    c: l.color || '#00ff00',
+                    sim: l.similarity ?? 0.38,
+                    sm: l.smoothness ?? 0.08,
+                    ap: l.animPreset || 'none',
+                    as: l.animSpeed ?? 1.0,
+                    aa: l.animAmp ?? 1.0,
+                    kf: l.keyframes || {}
+                }));
+                return {
+                    idx: idx,
+                    name: t.name || `Target ${idx + 1}`,
+                    ta: t.targetAspect || 1.0,
+                    dur: t.customDuration || 0,
+                    masks,
+                    l: mediaLayers
+                };
+            });
             return {
                 m: cleanStorageUrl(projData.mindUrl),
-                ta: firstTarget.targetAspect || 1.0,
-                dur: firstTarget.customDuration || 0,
-                masks,
-                l: mediaLayers
+                targets
             };
         }
 
         async function bootV7() {
             try {
-                // Wait until MindAR registers with A-Frame
                 while (!AFRAME.systems['mindar-image-system'] && !AFRAME.components['mindar-image']) {
                     await new Promise(r => setTimeout(r, 50));
                 }
 
                 const params = new URLSearchParams(window.location.search);
                 let mindUrl = '';
-                let targetAspect = 1.0;
-                let masterDuration = 0;
-                let masks = [];
-                let layers = [];
+                let targetsList = [];
 
-                // Mode 1: ?scene= (Compact Base64 or AES Scene Link from V7.2 Creator)
+                // Mode 1: ?scene= (V7.3 Multi-Target or V7.2 Single-Target Base64/AES)
                 if (params.get('scene')) {
                     let token = params.get('scene');
                     let jsonStr = '';
@@ -334,13 +371,27 @@
                     }
                     const decoded = JSON.parse(jsonStr);
                     mindUrl = cleanStorageUrl(decoded.m);
-                    targetAspect = decoded.ta || 1.0;
-                    masterDuration = decoded.dur || 0;
-                    masks = decoded.masks || [];
-                    layers = (decoded.l || []).map(item => ({
-                        ...item,
-                        u: cleanStorageUrl(item.u)
-                    }));
+
+                    if (decoded.targets && Array.isArray(decoded.targets)) {
+                        targetsList = decoded.targets.map((t, idx) => ({
+                            idx: t.idx ?? idx,
+                            name: t.name || `Print ${idx + 1}`,
+                            ta: t.ta || 1.0,
+                            dur: t.dur || 0,
+                            masks: t.masks || [],
+                            l: (t.l || []).map(item => ({ ...item, u: cleanStorageUrl(item.u) }))
+                        }));
+                    } else {
+                        // Legacy single-target ?scene= fallback
+                        targetsList = [{
+                            idx: 0,
+                            name: 'Print 1',
+                            ta: decoded.ta || 1.0,
+                            dur: decoded.dur || 0,
+                            masks: decoded.masks || [],
+                            l: (decoded.l || []).map(item => ({ ...item, u: cleanStorageUrl(item.u) }))
+                        }];
+                    }
                 }
                 // Mode 2: ?project= (External Dropbox project.json Link)
                 else if (params.get('project')) {
@@ -349,43 +400,24 @@
                     const pRes = await fetch(pUrl);
                     if (!pRes.ok) throw new Error('Could not load project.json from Dropbox');
                     const projData = await pRes.json();
-                    const norm = normalizeProjectToScene(projData);
+                    const norm = normalizeProjectJson(projData);
                     mindUrl = norm.m;
-                    targetAspect = norm.ta;
-                    masterDuration = norm.dur;
-                    masks = norm.masks;
-                    layers = norm.l;
+                    targetsList = norm.targets;
                 }
                 // Mode 3: ?projectData= (Inline Base64 project.json)
                 else if (params.get('projectData')) {
                     const projData = JSON.parse(decodeURIComponent(atob(params.get('projectData'))));
-                    const norm = normalizeProjectToScene(projData);
+                    const norm = normalizeProjectJson(projData);
                     mindUrl = norm.m;
-                    targetAspect = norm.ta;
-                    masterDuration = norm.dur;
-                    masks = norm.masks;
-                    layers = norm.l;
-                }
-                // Mode 4: ?mind=&video= (Direct Quick Test Link)
-                else {
-                    mindUrl = cleanStorageUrl(params.get('mind'));
-                    const videoParam = params.get('video') || params.get('v1');
-                    if (videoParam) {
-                        layers = videoParam.split(',').map(vUrl => ({
-                            t: 'video',
-                            u: cleanStorageUrl(vUrl),
-                            p: [0,0,0], s: [1,1,1], r: [0,0,0],
-                            op: 1.0, cs: 'none', ap: 'none', as: 1, aa: 1, kf: {}
-                        }));
-                    }
+                    targetsList = norm.targets;
                 }
 
-                if (!mindUrl || layers.length === 0) {
-                    statusEl.textContent = '❌ Missing .mind link or media layer in project';
+                if (!mindUrl || targetsList.length === 0) {
+                    statusEl.textContent = '❌ Missing .mind link or targets in URL';
                     return;
                 }
 
-                statusEl.textContent = '1/2 Loading AR Target...';
+                statusEl.textContent = '1/2 Loading AR Targets...';
                 const checkRes = await fetch(mindUrl);
                 if (!checkRes.ok) throw new Error(`Target .mind error (${checkRes.status})`);
                 const mindBuffer = await checkRes.arrayBuffer();
@@ -393,30 +425,37 @@
 
                 statusEl.textContent = '2/2 Starting Camera...';
 
-                let assetsHtml = '';
-                let entitiesHtml = '';
+                // Build <a-entity mindar-image-target="targetIndex: X"> for EVERY target slot!
+                let allTargetsHtml = '';
 
-                masks.forEach(m => {
-                    entitiesHtml += `<a-entity id="mask-${m.id}" position="${m.p.join(' ')}" scale="${m.s.join(' ')}" rotation="${m.r.join(' ')}"></a-entity>`;
-                });
+                targetsList.forEach((tSlot, tIdx) => {
+                    allVideosByTarget[tIdx] = [];
+                    let childrenHtml = '';
 
-                layers.forEach((l, idx) => {
-                    const posStr = (l.p || [0,0,0]).join(' ');
-                    const scaleStr = (l.s || [1,1,1]).join(' ');
-                    const rotStr = (l.r || [0,0,0]).join(' ');
-                    const encodedCfg = encodeURIComponent(JSON.stringify(l));
-                    const compAttr = `nizhali-layer="configJson: ${encodedCfg}; targetAspect: ${targetAspect}; masterDuration: ${masterDuration}"`;
+                    (tSlot.masks || []).forEach(m => {
+                        childrenHtml += `<a-entity id="mask-${tIdx}-${m.id}" position="${m.p.join(' ')}" scale="${m.s.join(' ')}" rotation="${m.r.join(' ')}"></a-entity>`;
+                    });
 
-                    if (l.t === 'video' || l.t === 'chroma') {
-                        assetsHtml += `<video id="vid-${idx}" src="${l.u}" preload="auto" loop muted playsinline webkit-playsinline crossorigin="anonymous"></video>`;
-                        const enableChroma = l.t === 'chroma' ? 1.0 : 0.0;
-                        entitiesHtml += `<a-plane id="ent-${idx}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr} width="1" height="1" material="shader: nizhali-surface; src: #vid-${idx}; color: ${l.c || '#00ff00'}; similarity: ${l.sim ?? 0.38}; smoothness: ${l.sm ?? 0.08}; enableChroma: ${enableChroma}; opacity: ${l.op ?? 1.0}; transparent: true; side: double"></a-plane>`;
-                    } else if (l.t === 'image') {
-                        assetsHtml += `<img id="img-${idx}" src="${l.u}" crossorigin="anonymous">`;
-                        entitiesHtml += `<a-plane id="ent-${idx}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr} width="1" height="1" material="shader: nizhali-surface; src: #img-${idx}; enableChroma: 0.0; opacity: ${l.op ?? 1.0}; transparent: true; side: double"></a-plane>`;
-                    } else if (l.t === 'glb') {
-                        entitiesHtml += `<a-gltf-model id="ent-${idx}" src="${l.u}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr}></a-gltf-model>`;
-                    }
+                    (tSlot.l || []).forEach((l, lIdx) => {
+                        const posStr = (l.p || [0,0,0]).join(' ');
+                        const scaleStr = (l.s || [1,1,1]).join(' ');
+                        const rotStr = (l.r || [0,0,0]).join(' ');
+                        const encodedCfg = encodeURIComponent(JSON.stringify(l));
+                        const compAttr = `nizhali-layer="configJson: ${encodedCfg}; targetIndex: ${tIdx}; targetAspect: ${tSlot.ta || 1.0}; masterDuration: ${tSlot.dur || 0}"`;
+                        const entId = `ent-${tIdx}-${lIdx}`;
+
+                        if (l.t === 'glb') {
+                            childrenHtml += `<a-gltf-model id="${entId}" src="${l.u}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr}></a-gltf-model>`;
+                        } else {
+                            childrenHtml += `<a-entity id="${entId}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr}></a-entity>`;
+                        }
+                    });
+
+                    allTargetsHtml += `
+                        <a-entity id="target-root-${tIdx}" mindar-image-target="targetIndex: ${tIdx}">
+                            ${childrenHtml}
+                        </a-entity>
+                    `;
                 });
 
                 window.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2.0);
@@ -427,69 +466,130 @@
                 sceneWrapper.innerHTML = `
                     <a-scene
                         id="ar-scene"
-                        mindar-image="imageTargetSrc: ${localMindBlobUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.001; filterBeta: 0.01; warmupTolerance: 1; missTolerance: 5;"
+                        mindar-image="imageTargetSrc: ${localMindBlobUrl}; maxTrack: 2; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.001; filterBeta: 0.01; warmupTolerance: 1; missTolerance: 5;"
                         color-space="sRGB"
                         renderer="colorManagement: true, physicallyCorrectLights: false, alpha: true, antialias: true, powerPreference: high-performance"
                         vr-mode-ui="enabled: false"
                         device-orientation-permission-ui="enabled: false"
                         embedded>
-                        <a-assets timeout="10000">${assetsHtml}</a-assets>
                         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-                        <a-entity id="target-root" mindar-image-target="targetIndex: 0">
-                            ${entitiesHtml}
-                        </a-entity>
+                        ${allTargetsHtml}
                     </a-scene>
                 `;
 
                 document.body.appendChild(sceneWrapper);
 
                 const sceneEl = document.getElementById('ar-scene');
-                const targetRoot = document.getElementById('target-root');
+                const THREE = AFRAME.THREE;
 
-                layers.forEach((l, idx) => {
-                    const ent = document.getElementById(`ent-${idx}`);
-                    if (l.t === 'video' || l.t === 'chroma') {
-                        const vid = document.getElementById(`vid-${idx}`);
-                        videoElements.push(vid);
-                        vid.addEventListener('loadedmetadata', () => {
-                            if (vid.videoWidth && vid.videoHeight) {
-                                ent.setAttribute('height', (vid.videoHeight / vid.videoWidth).toFixed(4));
-                            }
-                        });
-                    } else if (l.t === 'image') {
-                        const img = document.getElementById(`img-${idx}`);
-                        img.addEventListener('load', () => {
-                            if (img.naturalWidth && img.naturalHeight) {
-                                ent.setAttribute('height', (img.naturalHeight / img.naturalWidth).toFixed(4));
-                            }
-                        });
+                // Hydrate Three.js Video/Image Planes & 3D Portal Window Occluders for each Target Slot
+                targetsList.forEach((tSlot, tIdx) => {
+                    const targetRootEl = document.getElementById(`target-root-${tIdx}`);
+                    const tAspect = tSlot.ta || 1.0;
+
+                    // Check if any layer on this target is pushed into -Z with a portal clip mask
+                    const needsTargetPortalOccluder = (tSlot.l || []).some(l => l.cs === 'target' && l.p && l.p[2] < -0.01);
+                    if (needsTargetPortalOccluder && targetRootEl) {
+                        const portalFrame = createPortalWindowFrame(0.5, tAspect / 2);
+                        targetRootEl.object3D.add(portalFrame);
                     }
-                });
 
-                targetRoot.addEventListener('targetFound', () => {
-                    activeTargetFound = true;
-                    statusEl.textContent = '🎯 Target Locked';
-                    setTimeout(() => { if (activeTargetFound) statusEl.style.opacity = '0'; }, 1500);
-                    videoElements.forEach(vid => {
-                        vid.muted = isMuted;
-                        vid.play().catch(() => {
-                            vid.muted = true;
-                            isMuted = true;
-                            vid.play();
-                        });
+                    // Also attach portal occluders to any custom mask planes used by -Z layers
+                    (tSlot.masks || []).forEach(m => {
+                        const usedByDeepLayer = (tSlot.l || []).some(l => l.cs === m.id && l.p && l.p[2] < -0.01);
+                        const maskEl = document.getElementById(`mask-${tIdx}-${m.id}`);
+                        if (usedByDeepLayer && maskEl) {
+                            maskEl.object3D.add(createPortalWindowFrame(0.5, 0.5));
+                        }
                     });
-                    if (videoElements.length > 0) unmuteBtn.style.display = 'block';
-                });
 
-                targetRoot.addEventListener('targetLost', () => {
-                    activeTargetFound = false;
-                    statusEl.style.opacity = '1';
-                    statusEl.textContent = '📷 Scan Print';
-                    videoElements.forEach(vid => vid.pause());
+                    (tSlot.l || []).forEach((l, lIdx) => {
+                        const ent = document.getElementById(`ent-${tIdx}-${lIdx}`);
+                        if (!ent) return;
+
+                        if (l.t === 'video' || l.t === 'chroma') {
+                            const vid = document.createElement('video');
+                            vid.crossOrigin = 'anonymous';
+                            vid.src = l.u;
+                            vid.loop = true;
+                            vid.muted = true;
+                            vid.playsInline = true;
+                            vid.setAttribute('playsinline', '');
+                            vid.setAttribute('webkit-playsinline', '');
+                            vid.preload = 'auto';
+                            allVideosByTarget[tIdx].push(vid);
+
+                            const vidTex = new THREE.VideoTexture(vid);
+                            vidTex.minFilter = THREE.LinearFilter;
+                            vidTex.magFilter = THREE.LinearFilter;
+                            vidTex.encoding = THREE.sRGBEncoding;
+
+                            const mat = createNizhaliShaderMaterial(vidTex, l);
+                            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, tAspect), mat);
+                            mesh.renderOrder = 2 + lIdx;
+                            ent.object3D.add(mesh);
+
+                            vid.addEventListener('loadedmetadata', () => {
+                                if (vid.videoWidth && vid.videoHeight) {
+                                    mesh.geometry.dispose();
+                                    mesh.geometry = new THREE.PlaneGeometry(1, vid.videoHeight / vid.videoWidth);
+                                }
+                            });
+                            vid.load();
+                        } else if (l.t === 'image') {
+                            const mat = createNizhaliShaderMaterial(null, l);
+                            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+                            mesh.renderOrder = 10 + lIdx; // Render floating PNGs after videos
+                            ent.object3D.add(mesh);
+
+                            const img = new Image();
+                            img.crossOrigin = 'anonymous';
+                            img.onload = () => {
+                                const tex = new THREE.Texture(img);
+                                tex.encoding = THREE.sRGBEncoding;
+                                tex.needsUpdate = true;
+                                if (img.naturalWidth && img.naturalHeight) {
+                                    mesh.geometry.dispose();
+                                    mesh.geometry = new THREE.PlaneGeometry(1, img.naturalHeight / img.naturalWidth);
+                                }
+                                mat.uniforms.src.value = tex;
+                                mat.uniforms.hasTex.value = 1.0;
+                            };
+                            img.src = l.u;
+                        }
+                    });
+
+                    // Per-Target Found / Lost Event Listeners
+                    targetRootEl.addEventListener('targetFound', () => {
+                        activeTargetsCount++;
+                        statusEl.textContent = `🎯 Locked: ${tSlot.name}`;
+                        setTimeout(() => { if (activeTargetsCount > 0) statusEl.style.opacity = '0'; }, 1200);
+
+                        const vids = allVideosByTarget[tIdx] || [];
+                        vids.forEach(vid => {
+                            vid.muted = isMuted;
+                            vid.play().catch(() => {
+                                vid.muted = true;
+                                isMuted = true;
+                                vid.play().catch(() => {});
+                            });
+                        });
+                        if (vids.length > 0) unmuteBtn.style.display = 'block';
+                    });
+
+                    targetRootEl.addEventListener('targetLost', () => {
+                        activeTargetsCount = Math.max(0, activeTargetsCount - 1);
+                        const vids = allVideosByTarget[tIdx] || [];
+                        vids.forEach(vid => vid.pause());
+                        if (activeTargetsCount === 0) {
+                            statusEl.style.opacity = '1';
+                            statusEl.textContent = '📷 Scan Print';
+                        }
+                    });
                 });
 
                 sceneEl.addEventListener('arReady', () => {
-                    statusEl.textContent = '✅ AR Ready! Scan Print';
+                    statusEl.textContent = `✅ Ready! Scan Print (${targetsList.length} Targets)`;
                 });
 
             } catch (err) {
@@ -499,9 +599,8 @@
 
         function toggleAudio() {
             isMuted = !isMuted;
-            videoElements.forEach(vid => {
+            Object.values(allVideosByTarget).flat().forEach(vid => {
                 vid.muted = isMuted;
-                if (!isMuted) vid.play();
             });
             unmuteBtn.textContent = isMuted ? '🔇 Tap for Sound' : '🔊 Sound On';
         }
