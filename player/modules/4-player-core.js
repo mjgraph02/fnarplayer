@@ -219,15 +219,14 @@ async function bootNizhaliPlayer() {
 
         window.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2.0);
 
-        // Balanced One-Euro Filter: filterMinCF: 0.001 (kills stationary perspective jitter)
-        // filterBeta: 0.15 (15x faster motion response without high-frequency homography jumping)
+        // THE GOLDEN MIDDLE FILTER: filterMinCF 0.0005 (Kills vibration), filterBeta 0.05 (Responsive)
         const sceneWrapper = document.createElement('div');
         sceneWrapper.style.width = '100%';
         sceneWrapper.style.height = '100%';
         sceneWrapper.innerHTML = `
             <a-scene
                 id="ar-scene"
-                mindar-image="imageTargetSrc: ${localMindBlobUrl}; maxTrack: ${maxTrack}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.001; filterBeta: 0.15; warmupTolerance: 2; missTolerance: 4;"
+                mindar-image="imageTargetSrc: ${localMindBlobUrl}; maxTrack: ${maxTrack}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.0005; filterBeta: 0.05; warmupTolerance: 1; missTolerance: 5;"
                 renderer="colorManagement: false, physicallyCorrectLights: false, alpha: true, antialias: true, powerPreference: high-performance, preserveDrawingBuffer: true"
                 vr-mode-ui="enabled: false"
                 device-orientation-permission-ui="enabled: false"
@@ -264,7 +263,7 @@ async function bootNizhaliPlayer() {
 
                 if (l.t === 'video' || l.t === 'chroma') {
                     const vid = document.createElement('video');
-                    vid.crossOrigin = 'anonymous';
+                    vid.crossOrigin = 'anonymous'; // CRITICAL FOR RECORDING
                     vid.src = l.u;
                     vid.loop = true;
                     vid.muted = true;
@@ -297,7 +296,7 @@ async function bootNizhaliPlayer() {
                     ent.object3D.add(mesh);
 
                     const img = new Image();
-                    img.crossOrigin = 'anonymous';
+                    img.crossOrigin = 'anonymous'; // CRITICAL FOR RECORDING
                     img.onload = () => {
                         const tex = new THREE.Texture(img);
                         tex.minFilter = THREE.LinearFilter;
@@ -314,7 +313,6 @@ async function bootNizhaliPlayer() {
                 }
             });
 
-            // Target Lock-On Event
             targetRootEl.addEventListener('targetFound', () => {
                 if (targetLossTimers[tIdx]) {
                     clearInterval(targetLossTimers[tIdx]);
@@ -351,7 +349,6 @@ async function bootNizhaliPlayer() {
                 if (vids.length > 0) btnAudio.style.display = 'flex';
             });
 
-            // Target Lost Event
             targetRootEl.addEventListener('targetLost', () => {
                 activeTargetsCount = Math.max(0, activeTargetsCount - 1);
                 const vids = allVideosByTarget[tIdx] || [];

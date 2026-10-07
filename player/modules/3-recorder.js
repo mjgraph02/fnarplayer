@@ -72,11 +72,15 @@
                 dh = w / vAspect;
                 dy = -(dh - h) / 2;
             }
-            ctx.drawImage(camVideo, dx, dy, dw, dh);
+            try {
+                ctx.drawImage(camVideo, dx, dy, dw, dh);
+            } catch(e) {}
         }
 
         if (glCanvas) {
-            ctx.drawImage(glCanvas, 0, 0, w, h);
+            try {
+                ctx.drawImage(glCanvas, 0, 0, w, h);
+            } catch(e) {}
         }
     }
 
@@ -99,9 +103,18 @@
 
         drawCompositeFrame(snapCtx, w, h, camVideo, glCanvas);
 
-        snapCanvas.toBlob(blob => {
-            if (blob) showPreview(blob, 'image');
-        }, 'image/jpeg', 0.95);
+        try {
+            snapCanvas.toBlob(blob => {
+                if (blob) {
+                    showPreview(blob, 'image');
+                } else {
+                    alert("Capture failed: Empty image data generated.");
+                }
+            }, 'image/jpeg', 0.95);
+        } catch (e) {
+            console.error("Canvas Tainted!", e);
+            alert("Security Block: Mobile browser prevented saving due to Cross-Origin textures. We will fix this on the server later.");
+        }
     }
 
     function startCompositor(camVideo, glCanvas) {
@@ -136,8 +149,14 @@
 
         startCompositor(camVideo, glCanvas);
         
-        // 30fps is safer for mobile web encoders than 60fps
-        const canvasStream = compCanvas.captureStream(30); 
+        let canvasStream;
+        try {
+            canvasStream = compCanvas.captureStream(30); 
+        } catch(e) {
+            alert("Security Block: Browser blocked video stream due to Cross-Origin data.");
+            isRecording = false;
+            return;
+        }
 
         try {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -159,12 +178,22 @@
             if (audioTracks.length > 0) canvasStream.addTrack(audioTracks[0]);
         } catch (e) {}
 
-        // Removed strict bitrate limits that crashed iOS Safari
+        const options = {};
+        if (MediaRecorder.isTypeSupported('video/mp4')) {
+            options.mimeType = 'video/mp4';
+        } else if (MediaRecorder.isTypeSupported('video/webm')) {
+            options.mimeType = 'video/webm';
+        }
+
         try {
-            mediaRecorder = new MediaRecorder(canvasStream);
+            mediaRecorder = new MediaRecorder(canvasStream, options);
         } catch (err) {
-            console.error("MediaRecorder init failed", err);
-            return; 
+            try { mediaRecorder = new MediaRecorder(canvasStream); } 
+            catch(err2) {
+                alert("Your mobile browser does not support Web Video Recording.");
+                isRecording = false;
+                return;
+            }
         }
 
         mediaRecorder.ondataavailable = (e) => {
@@ -175,16 +204,22 @@
 
         mediaRecorder.onstop = () => {
             cancelAnimationFrame(compAnimFrame);
+            
+            // STRONG FALLBACK: If video failed to encode, take a photo instead.
             if (recordedChunks.length === 0) {
-                // FALLBACK: If phone video encoder fails, save a photo instead of doing nothing!
                 capturePhoto();
                 return;
             }
+            
             const blob = new Blob(recordedChunks, { type: (mediaRecorder.mimeType || 'video/mp4') });
-            if (blob.size > 0) showPreview(blob, 'video');
+            if (blob.size === 0) {
+                capturePhoto();
+                return;
+            }
+            
+            showPreview(blob, 'video');
         };
 
-        // Request data frequently so iOS doesn't drop the buffer
         mediaRecorder.start(200); 
         recordStartTime = performance.now();
         shutterWrap.classList.add('recording');
@@ -250,11 +285,9 @@
         setTimeout(() => zoomInd.classList.remove('visible'), 500);
     }
 
-    // Bulletproof Mobile Touch / Pointer Handlers
     function handlePointerDown(e) {
         if (e.cancelable) e.preventDefault(); 
         
-        // Tap to stop if locked
         if (isRecording && isLocked) {
             stopVideoRecording();
             return;
@@ -282,13 +315,11 @@
         const dy = startY - curY; // Up is positive
 
         if (isRecording) {
-            // Slide Left to Lock
             if (dx < -45 && !isLocked) {
                 isLocked = true;
                 lockPill.classList.add('locked');
                 if (navigator.vibrate) navigator.vibrate(40);
             }
-            // Slide Up/Down to Zoom
             if (dy > 15) {
                 const zoomVal = 1.0 + (dy - 15) / 130;
                 setZoom(zoomVal);
@@ -302,7 +333,6 @@
         if (!isPressActive) return;
         isPressActive = false;
 
-        // Photo Tap
         if (pressTimer) {
             clearTimeout(pressTimer);
             pressTimer = null;
@@ -310,20 +340,17 @@
             return;
         }
 
-        // Released finger while holding video
         if (isRecording && !isLocked) {
             stopVideoRecording();
         }
     }
 
-    // Use pure Pointer Events for modern mobile/desktop sync (No touchcancel swallowed)
-    shutterWrap.style.touchAction = 'none'; // Critical for pointer events
+    shutterWrap.style.touchAction = 'none';
     shutterWrap.addEventListener('pointerdown', handlePointerDown);
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
 
-    // Preview & Save
     function showPreview(blob, type) {
         previewBox.innerHTML = '';
         const url = URL.createObjectURL(blob);
