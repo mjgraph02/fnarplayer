@@ -1,5 +1,5 @@
 // ============================================================================
-// PLAYER MODULE 04 // TUNED ONE-EURO TRACKING, FAST CAMERA & SMOOTH LOSS FADE
+// PLAYER MODULE 04 // TUNED SENSOR FUSION, GYRO FALLBACK & DEAD-RECKONING HOLD
 // ============================================================================
 
 import '../../vendor/mindar-image-aframe.prod.js';
@@ -17,6 +17,108 @@ let allVideosByTarget = {};
 let targetLossTimers = {};
 let isMuted = true;
 let activeTargetsCount = 0;
+
+// iOS Safari requires explicit user interaction to activate Gyroscope Sensor Fusion
+function requestGyroPermission() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission().catch(() => {});
+    }
+}
+window.addEventListener('click', requestGyroPermission, { once: true });
+window.addEventListener('touchstart', requestGyroPermission, { once: true });
+
+// ============================================================================
+// V8 ENGINE: GYROSCOPE SENSOR FUSION & SLERP COMPLEMENTARY FILTER
+// ============================================================================
+AFRAME.registerComponent('nizhali-gyro-fusion', {
+    init: function() {
+        this.cameraQuat = new THREE.Quaternion();
+        this.anchorPos = new THREE.Vector3();
+        this.anchorQuat = new THREE.Quaternion();
+        this.hasAnchor = false;
+        this.q0 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+        this.zee = new THREE.Vector3(0, 0, 1);
+        this.euler = new THREE.Euler();
+        
+        this.lastOpticalMatrix = new THREE.Matrix4();
+        this.myLastOverride = new THREE.Matrix4();
+        this.tempPos = new THREE.Vector3();
+        this.tempQuat = new THREE.Quaternion();
+        this.tempScale = new THREE.Vector3();
+        
+        this.deviceAlpha = 0; this.deviceBeta = 0; this.deviceGamma = 0;
+        this.screenOrient = window.orientation || 0;
+        
+        window.addEventListener('deviceorientation', (e) => {
+            this.deviceAlpha = e.alpha ? THREE.Math.degToRad(e.alpha) : 0;
+            this.deviceBeta = e.beta ? THREE.Math.degToRad(e.beta) : 0;
+            this.deviceGamma = e.gamma ? THREE.Math.degToRad(e.gamma) : 0;
+        }, true);
+        
+        window.addEventListener('orientationchange', () => {
+            this.screenOrient = window.orientation || 0;
+        }, false);
+    },
+    tick: function() {
+        if (!this.el.object3D.visible) {
+            this.hasAnchor = false;
+            return;
+        }
+
+        const currentMatrix = this.el.object3D.matrix.clone();
+        let isFreshOptical = false;
+
+        // Detect if MindAR output a fresh optical pose by bypassing stale caches
+        const isOurOverride = Math.abs(currentMatrix.elements[0] - this.myLastOverride.elements[0]) < 0.0001 &&
+                              Math.abs(currentMatrix.elements[12] - this.myLastOverride.elements[12]) < 0.0001;
+        const isOldOptical = Math.abs(currentMatrix.elements[0] - this.lastOpticalMatrix.elements[0]) < 0.0001 &&
+                             Math.abs(currentMatrix.elements[12] - this.lastOpticalMatrix.elements[12]) < 0.0001;
+
+        if (!isOurOverride && !isOldOptical) {
+            this.lastOpticalMatrix.copy(currentMatrix);
+            isFreshOptical = true;
+        }
+
+        // Compute true physical world rotation from 120Hz hardware gyroscope
+        this.euler.set(this.deviceBeta, this.deviceAlpha, -this.deviceGamma, 'YXZ');
+        this.cameraQuat.setFromEuler(this.euler);
+        this.cameraQuat.multiply(this.q0);
+        this.cameraQuat.multiply(new THREE.Quaternion().setFromAxisAngle(this.zee, -THREE.Math.degToRad(this.screenOrient)));
+
+        const Q_camera = this.cameraQuat;
+        const Q_camera_inv = Q_camera.clone().invert();
+
+        if (isFreshOptical) {
+            currentMatrix.decompose(this.tempPos, this.tempQuat, this.tempScale);
+            const newAnchorPos = this.tempPos.clone().applyQuaternion(Q_camera);
+            const newAnchorQuat = Q_camera.clone().multiply(this.tempQuat);
+
+            if (!this.hasAnchor) {
+                this.anchorPos.copy(newAnchorPos);
+                this.anchorQuat.copy(newAnchorQuat);
+                this.hasAnchor = true;
+            } else {
+                // The Kalman Blend: Gently correct Gyro drift using Optical Anchor
+                this.anchorPos.lerp(newAnchorPos, 0.15); 
+                this.anchorQuat.slerp(newAnchorQuat, 0.15);
+            }
+        }
+
+        // Apply Dead-Reckoning Hold (Locks graphics during Motion Blur)
+        if (this.hasAnchor) {
+            const localPos = this.anchorPos.clone().applyQuaternion(Q_camera_inv);
+            const localQuat = Q_camera_inv.clone().multiply(this.anchorQuat);
+
+            this.el.object3D.position.copy(localPos);
+            this.el.object3D.quaternion.copy(localQuat);
+            this.el.object3D.matrixAutoUpdate = true;
+            this.el.object3D.updateMatrix();
+            this.myLastOverride.copy(this.el.object3D.matrix);
+        }
+    }
+});
+// ============================================================================
+
 
 function setLoaderProgress(pct, msg) {
     if (brandProgress) brandProgress.style.width = `${pct}%`;
@@ -210,8 +312,9 @@ async function bootNizhaliPlayer() {
                 }
             });
 
+            // V8 UPDATE: Added nizhali-gyro-fusion directly to the MindAR root entity!
             allTargetsHtml += `
-                <a-entity id="target-root-${tIdx}" mindar-image-target="targetIndex: ${tIdx}">
+                <a-entity id="target-root-${tIdx}" mindar-image-target="targetIndex: ${tIdx}" nizhali-gyro-fusion>
                     ${childrenHtml}
                 </a-entity>
             `;
@@ -219,7 +322,6 @@ async function bootNizhaliPlayer() {
 
         window.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2.0);
 
-        // THE GOLDEN MIDDLE FILTER: filterMinCF 0.0005 (Kills vibration), filterBeta 0.05 (Responsive)
         const sceneWrapper = document.createElement('div');
         sceneWrapper.style.width = '100%';
         sceneWrapper.style.height = '100%';
@@ -263,7 +365,7 @@ async function bootNizhaliPlayer() {
 
                 if (l.t === 'video' || l.t === 'chroma') {
                     const vid = document.createElement('video');
-                    vid.crossOrigin = 'anonymous'; // CRITICAL FOR RECORDING
+                    vid.crossOrigin = 'anonymous'; 
                     vid.src = l.u;
                     vid.loop = true;
                     vid.muted = true;
@@ -296,7 +398,7 @@ async function bootNizhaliPlayer() {
                     ent.object3D.add(mesh);
 
                     const img = new Image();
-                    img.crossOrigin = 'anonymous'; // CRITICAL FOR RECORDING
+                    img.crossOrigin = 'anonymous'; 
                     img.onload = () => {
                         const tex = new THREE.Texture(img);
                         tex.minFilter = THREE.LinearFilter;
