@@ -35,8 +35,15 @@ window.redo = function() {
 
 function buildProjectPayload() {
     return {
-        version: '7.3',
+        version: '7.4', // V7.4 Upgrade
         mindUrl: projectState.mindUrl || document.getElementById('mindUrlInput').value.trim(),
+        global: {
+            autoLight: document.getElementById('globalAutoLight')?.checked ?? true,
+            autoAudio: document.getElementById('globalAutoAudio')?.checked ?? false,
+            lossBehavior: document.getElementById('globalLossBehavior')?.value ?? 'fade',
+            lossHoldTime: parseFloat(document.getElementById('globalLossTime')?.value) || 0.35,
+            maxTrack: parseInt(document.getElementById('globalMaxTrack')?.value) || 1
+        },
         activeTargetIndex: projectState.activeTargetIndex,
         targetIndexMap: projectState.targetIndexMap || [],
         targets: projectState.targets.map(t => ({
@@ -72,7 +79,11 @@ function buildProjectPayload() {
                 animPreset: l.animPreset,
                 animSpeed: l.animSpeed,
                 animAmp: l.animAmp,
-                keyframes: l.keyframes
+                keyframes: l.keyframes,
+                // New V7.4 Parameters
+                playbackRule: l.playbackRule || 'loop',
+                delay: l.delay || 0,
+                blendMode: l.blendMode || 'normal'
             }))
         }))
     };
@@ -89,6 +100,24 @@ function applyProjectPayload(data) {
     projectState.mindUrl = data.mindUrl || '';
     document.getElementById('mindUrlInput').value = projectState.mindUrl;
     projectState.targetIndexMap = data.targetIndexMap || [];
+
+    // Restore V7.4 Global Director Settings
+    if (data.global) {
+        const gLight = document.getElementById('globalAutoLight');
+        if (gLight) gLight.checked = data.global.autoLight !== false;
+        
+        const gAudio = document.getElementById('globalAutoAudio');
+        if (gAudio) gAudio.checked = !!data.global.autoAudio;
+        
+        const gLoss = document.getElementById('globalLossBehavior');
+        if (gLoss) gLoss.value = data.global.lossBehavior || 'fade';
+        
+        const gLossTime = document.getElementById('globalLossTime');
+        if (gLossTime) gLossTime.value = data.global.lossHoldTime ?? 0.35;
+        
+        const gMax = document.getElementById('globalMaxTrack');
+        if (gMax) gMax.value = data.global.maxTrack || 1;
+    }
 
     projectState.targets = (data.targets || []).map((tData, idx) => {
         const slot = createDefaultTargetSlot(tData.mode || 'image', idx);
@@ -214,7 +243,11 @@ window.exportProject = function() {
                     ap: l.animPreset || 'none',
                     as: l.animSpeed ?? 1.0,
                     aa: l.animAmp ?? 1.0,
-                    kf: l.keyframes || {}
+                    kf: l.keyframes || {},
+                    // Compact V7.4 properties for URL limits
+                    pr: l.playbackRule || 'loop',
+                    dl: l.delay || 0,
+                    bm: l.blendMode || 'normal'
                 };
             });
 
@@ -230,8 +263,15 @@ window.exportProject = function() {
         });
 
         const sceneObj = {
-            v: 7.3,
+            v: 7.4,
             m: mind,
+            g: {
+                al: document.getElementById('globalAutoLight')?.checked ?? true,
+                aa: document.getElementById('globalAutoAudio')?.checked ?? false,
+                lb: document.getElementById('globalLossBehavior')?.value ?? 'fade',
+                lh: parseFloat(document.getElementById('globalLossTime')?.value) || 0.35,
+                mt: parseInt(document.getElementById('globalMaxTrack')?.value) || 1
+            },
             targets: exportedTargets
         };
         const b64 = btoa(encodeURIComponent(JSON.stringify(sceneObj)));
@@ -240,6 +280,6 @@ window.exportProject = function() {
 
     const box = document.getElementById('export-box');
     box.style.display = 'block';
-    box.innerHTML = `<b>V7.3 MULTI-TARGET LINK:</b><br><a href="${finalLink}" target="_blank" style="color:var(--te-green);">${finalLink}</a>`;
-    showToast(`⚡ Exported ${projectState.targets.length} Target(s) to V7.3 Link!`);
+    box.innerHTML = `<b>V7.4 MULTI-TARGET LINK:</b><br><a href="${finalLink}" target="_blank" style="color:var(--te-green);">${finalLink}</a>`;
+    showToast(`⚡ Exported ${projectState.targets.length} Target(s) to V7.4 Link!`);
 };

@@ -1,5 +1,5 @@
 // ============================================================================
-// MODULE 04 // KEYFRAME AUTOMATION, TIMELINE SCRUBBER & RENDER LOOP
+// MODULE 04 // KEYFRAME AUTOMATION, TIMELINE SCRUBBER & RENDER LOOP (V7.4)
 // ============================================================================
 
 const ANIMATABLE_PARAMS = [
@@ -14,7 +14,7 @@ window.updateMasterDuration = function() {
     let maxMediaDur = 0;
     let hasAnim = false;
 
-    layers.forEach(l => {
+    window.layers.forEach(l => {
         if (l.duration && l.duration > maxMediaDur) maxMediaDur = l.duration;
         if (l.animPreset && l.animPreset !== 'none') hasAnim = true;
         if (l.keyframes) {
@@ -29,16 +29,16 @@ window.updateMasterDuration = function() {
     const scrubber = document.getElementById('masterTimelineScrubber');
 
     if (maxMediaDur > 0) {
-        masterDuration = parseFloat(maxMediaDur.toFixed(2));
-        badge.textContent = `VIDEO SYNC ${masterDuration}s`;
+        window.masterDuration = parseFloat(maxMediaDur.toFixed(2));
+        badge.textContent = `VIDEO SYNC ${window.masterDuration}s`;
     } else if (hasAnim) {
-        masterDuration = customDur;
-        badge.textContent = `LOOP ${masterDuration}s`;
+        window.masterDuration = customDur;
+        badge.textContent = `LOOP ${window.masterDuration}s`;
     } else {
-        masterDuration = 0;
+        window.masterDuration = 0;
         badge.textContent = `STATIC 0s`;
     }
-    scrubber.max = Math.max(masterDuration, customDur);
+    scrubber.max = Math.max(window.masterDuration, customDur);
     renderKeyframeMarkers();
 };
 
@@ -60,7 +60,7 @@ function getParamBaseValue(l, p) {
     return 0;
 }
 
-function setParamBaseValue(l, p, v) {
+window.setParamBaseValue = function(l, p, v) {
     if (p === 'posX') l.pos[0] = v;
     else if (p === 'posY') l.pos[1] = v;
     else if (p === 'posZ') l.pos[2] = v;
@@ -75,6 +75,15 @@ function setParamBaseValue(l, p, v) {
     else if (p === 'animAmp') l.animAmp = v;
     else if (p === 'similarity') l.similarity = v;
     else if (p === 'smoothness') l.smoothness = v;
+};
+
+// V7.4: Dynamic Easing Calculator
+function getEasingFactor(r) {
+    const easeType = document.getElementById('keyframeEasingSelect')?.value || 'ease';
+    if (easeType === 'linear') return r;
+    if (easeType === 'easeIn') return r * r;
+    if (easeType === 'easeOut') return r * (2 - r);
+    return r * r * (3 - 2 * r); // Default 'ease' (Smoothstep)
 }
 
 function evaluateKeyframedParam(l, p, t) {
@@ -88,7 +97,7 @@ function evaluateKeyframedParam(l, p, t) {
         if (t >= kfs[i].t && t <= kfs[i + 1].t) {
             const span = kfs[i + 1].t - kfs[i].t;
             const r = span > 0.0001 ? (t - kfs[i].t) / span : 0;
-            const sr = r * r * (3 - 2 * r);
+            const sr = getEasingFactor(r); // Applied V7.4 Easing
             return kfs[i].v + (kfs[i + 1].v - kfs[i].v) * sr;
         }
     }
@@ -96,11 +105,11 @@ function evaluateKeyframedParam(l, p, t) {
 }
 
 window.toggleParamKeyframe = function(p) {
-    const l = getPrimarySelectedItem();
+    const l = window.getPrimarySelectedItem ? window.getPrimarySelectedItem() : null;
     if (!l) return;
     if (!l.keyframes) l.keyframes = {};
     if (!l.keyframes[p]) l.keyframes[p] = [];
-    const t = parseFloat(masterTime.toFixed(2));
+    const t = parseFloat(window.masterTime.toFixed(2));
     const v = getParamBaseValue(l, p);
     const idx = l.keyframes[p].findIndex(k => Math.abs(k.t - t) < 0.05);
     if (idx !== -1) l.keyframes[p][idx].v = v;
@@ -108,19 +117,19 @@ window.toggleParamKeyframe = function(p) {
         l.keyframes[p].push({ t, v });
         l.keyframes[p].sort((a, b) => a.t - b.t);
     }
-    updateMasterDuration();
-    refreshKeyframeDiamonds();
-    if (window.saveHistoryState) saveHistoryState();
-    showToast(`◆ Keyframed ${p} @ ${t}s`);
+    window.updateMasterDuration();
+    if (window.refreshKeyframeDiamonds) window.refreshKeyframeDiamonds();
+    if (window.saveHistoryState) window.saveHistoryState();
+    if (window.showToast) window.showToast(`◆ Keyframed ${p} @ ${t}s`);
 };
 
 window.addKeyframeForGroup = function(group) {
-    const l = getPrimarySelectedItem();
+    const l = window.getPrimarySelectedItem ? window.getPrimarySelectedItem() : null;
     if (!l || group !== 'transform') return;
     ['posX', 'posY', 'posZ', 'scaleX', 'scaleY', 'scaleZ', 'rotX', 'rotY', 'rotZ'].forEach(p => {
         if (!l.keyframes) l.keyframes = {};
         if (!l.keyframes[p]) l.keyframes[p] = [];
-        const t = parseFloat(masterTime.toFixed(2));
+        const t = parseFloat(window.masterTime.toFixed(2));
         const v = getParamBaseValue(l, p);
         const idx = l.keyframes[p].findIndex(k => Math.abs(k.t - t) < 0.05);
         if (idx !== -1) l.keyframes[p][idx].v = v;
@@ -129,21 +138,23 @@ window.addKeyframeForGroup = function(group) {
             l.keyframes[p].sort((a, b) => a.t - b.t);
         }
     });
-    updateMasterDuration();
-    refreshKeyframeDiamonds();
-    showToast(`◆ Keyframed Transform @ ${masterTime.toFixed(2)}s`);
+    window.updateMasterDuration();
+    if (window.refreshKeyframeDiamonds) window.refreshKeyframeDiamonds();
+    if (window.showToast) window.showToast(`◆ Keyframed Transform @ ${window.masterTime.toFixed(2)}s`);
 };
 
 window.toggleAutoKey = function() {
-    autoKeyEnabled = !autoKeyEnabled;
+    window.autoKeyEnabled = !window.autoKeyEnabled;
     const btn = document.getElementById('autoKeyBtn');
-    btn.textContent = autoKeyEnabled ? '🔴 AUTO-KEY: ON' : '🔴 AUTO-KEY: OFF';
-    btn.style.background = autoKeyEnabled ? 'var(--te-red)' : '';
-    btn.style.color = autoKeyEnabled ? '#fff' : '';
+    if (btn) {
+        btn.textContent = window.autoKeyEnabled ? '🔴 AUTO-KEY: ON' : '🔴 AUTO-KEY: OFF';
+        btn.style.background = window.autoKeyEnabled ? 'var(--te-red)' : '';
+        btn.style.color = window.autoKeyEnabled ? '#fff' : '';
+    }
 };
 
 window.onParamEdit = function(p) {
-    const l = getPrimarySelectedItem();
+    const l = window.getPrimarySelectedItem ? window.getPrimarySelectedItem() : null;
     if (!l) return;
     const paramKey = (p === 'chromaSim') ? 'similarity' : ((p === 'chromaSmooth') ? 'smoothness' : p);
     const map = {
@@ -166,34 +177,35 @@ window.onParamEdit = function(p) {
         document.getElementById('scaleY').value = v;
         document.getElementById('scaleZ').value = v;
         ['scaleX', 'scaleY', 'scaleZ'].forEach(sp => {
-            if (autoKeyEnabled || (l.keyframes && l.keyframes[sp] && l.keyframes[sp].length > 0)) {
-                toggleParamKeyframe(sp);
+            if (window.autoKeyEnabled || (l.keyframes && l.keyframes[sp] && l.keyframes[sp].length > 0)) {
+                window.toggleParamKeyframe(sp);
             }
         });
     } else {
-        setParamBaseValue(l, paramKey, v);
-        if (autoKeyEnabled || (l.keyframes && l.keyframes[paramKey] && l.keyframes[paramKey].length > 0)) {
-            toggleParamKeyframe(paramKey);
+        window.setParamBaseValue(l, paramKey, v);
+        if (window.autoKeyEnabled || (l.keyframes && l.keyframes[paramKey] && l.keyframes[paramKey].length > 0)) {
+            window.toggleParamKeyframe(paramKey);
         }
     }
 
-    if (paramKey === 'opacity') document.getElementById('opacityVal').textContent = v.toFixed(2);
-    if (paramKey === 'animSpeed') document.getElementById('animSpeedVal').textContent = v;
-    if (paramKey === 'animAmp') document.getElementById('animAmpVal').textContent = v;
-    if (paramKey === 'similarity') document.getElementById('simVal').textContent = v;
-    if (paramKey === 'smoothness') document.getElementById('smoothVal').textContent = v;
+    if (paramKey === 'opacity') { const o = document.getElementById('opacityVal'); if (o) o.textContent = v.toFixed(2); }
+    if (paramKey === 'animSpeed') { const s = document.getElementById('animSpeedVal'); if (s) s.textContent = v; }
+    if (paramKey === 'animAmp') { const a = document.getElementById('animAmpVal'); if (a) a.textContent = v; }
+    if (paramKey === 'similarity') { const sm = document.getElementById('simVal'); if (sm) sm.textContent = v; }
+    if (paramKey === 'smoothness') { const smt = document.getElementById('smoothVal'); if (smt) smt.textContent = v; }
 
-    if (window.applyTransformAndEffectsImmediate) applyTransformAndEffectsImmediate(l);
-    if (window.renderLayerList) renderLayerList();
+    if (window.applyTransformAndEffectsImmediate) window.applyTransformAndEffectsImmediate(l);
+    if (window.renderLayerList) window.renderLayerList();
 };
 
-function renderKeyframeMarkers() {
+window.renderKeyframeMarkers = function() {
     const track = document.getElementById('keyframeTrack');
+    if (!track) return;
     track.innerHTML = '';
-    const l = getPrimarySelectedItem();
+    const l = window.getPrimarySelectedItem ? window.getPrimarySelectedItem() : null;
     if (!l || !l.keyframes) return;
 
-    const maxT = Math.max(masterDuration, parseFloat(document.getElementById('customDurationInput').value) || 5.0);
+    const maxT = Math.max(window.masterDuration, parseFloat(document.getElementById('customDurationInput')?.value) || 5.0);
     const times = new Map();
     for (const p in l.keyframes) {
         (l.keyframes[p] || []).forEach(kf => {
@@ -209,54 +221,57 @@ function renderKeyframeMarkers() {
         m.className = 'kf-marker';
         m.style.left = Math.min(99, Math.max(1, (t / maxT) * 100)) + '%';
         m.title = `${tStr}s [${pList.join(', ')}]`;
-        m.onclick = (e) => { e.stopPropagation(); scrubMasterTimeline(t); };
+        m.onclick = (e) => { e.stopPropagation(); window.scrubMasterTimeline(t); };
         m.oncontextmenu = (e) => {
             e.preventDefault(); e.stopPropagation();
             pList.forEach(p => { l.keyframes[p] = l.keyframes[p].filter(k => Math.abs(k.t - t) > 0.05); });
-            updateMasterDuration(); refreshKeyframeDiamonds();
-            if (window.saveHistoryState) saveHistoryState();
+            window.updateMasterDuration(); 
+            if (window.refreshKeyframeDiamonds) window.refreshKeyframeDiamonds();
+            if (window.saveHistoryState) window.saveHistoryState();
         };
         track.appendChild(m);
     });
-}
+};
 
-function refreshKeyframeDiamonds() {
-    const l = getPrimarySelectedItem();
+window.refreshKeyframeDiamonds = function() {
+    const l = window.getPrimarySelectedItem ? window.getPrimarySelectedItem() : null;
     ANIMATABLE_PARAMS.forEach(p => {
         const btn = document.getElementById('kf-' + p);
         if (btn) btn.classList.toggle('has-kf', !!(l && l.keyframes && l.keyframes[p] && l.keyframes[p].length));
     });
-    renderKeyframeMarkers();
-}
+    if (window.renderKeyframeMarkers) window.renderKeyframeMarkers();
+};
 
 window.toggleMasterPlay = function() {
-    masterPlaying = !masterPlaying;
-    document.getElementById('masterPlayBtn').textContent = masterPlaying ? '⏸ PAUSE' : '▶️ PLAY';
-    layers.forEach(l => {
+    window.masterPlaying = !window.masterPlaying;
+    const btn = document.getElementById('masterPlayBtn');
+    if (btn) btn.textContent = window.masterPlaying ? '⏸ PAUSE' : '▶️ PLAY';
+    window.layers.forEach(l => {
         if (l.videoEl) {
-            if (masterPlaying) l.videoEl.play().catch(() => {});
+            if (window.masterPlaying) l.videoEl.play().catch(() => {});
             else l.videoEl.pause();
         }
     });
 };
 
 window.scrubMasterTimeline = function(val) {
-    masterTime = parseFloat(val) || 0;
-    masterPlaying = false;
-    document.getElementById('masterPlayBtn').textContent = '▶️ PLAY';
-    layers.forEach(l => {
-        if (l.videoEl && l.duration > 0) { l.videoEl.pause(); l.videoEl.currentTime = masterTime % l.duration; }
-        if (l.mixer && l.duration > 0) l.mixer.setTime(masterTime % l.duration);
+    window.masterTime = parseFloat(val) || 0;
+    window.masterPlaying = false;
+    const btn = document.getElementById('masterPlayBtn');
+    if (btn) btn.textContent = '▶️ PLAY';
+    window.layers.forEach(l => {
+        if (l.videoEl && l.duration > 0) { l.videoEl.pause(); l.videoEl.currentTime = window.masterTime % l.duration; }
+        if (l.mixer && l.duration > 0) l.mixer.setTime(window.masterTime % l.duration);
     });
-    evaluateSceneAtTime(masterTime, true);
+    evaluateSceneAtTime(window.masterTime, true);
 };
 
 const clock = new THREE.Clock();
 
 function evaluateSceneAtTime(t, updateUI = false) {
-    layers.forEach(l => {
+    window.layers.forEach(l => {
         if (!l.mesh) return;
-        const dragging = (transformControl.dragging && selectedIds.includes(l.id));
+        const dragging = (window.transformControl && window.transformControl.dragging && window.selectedIds.includes(l.id));
 
         let px = evaluateKeyframedParam(l, 'posX', t);
         let py = evaluateKeyframedParam(l, 'posY', t);
@@ -285,10 +300,10 @@ function evaluateSceneAtTime(t, updateUI = false) {
                 rz += Math.sin(ph * 2.5) * 8 * amp;
                 rx += Math.cos(ph * 2.0) * 5 * amp;
             } else if (l.animPreset === 'fadeIn') {
-                const d = masterDuration > 0 ? masterDuration : 3.0;
+                const d = window.masterDuration > 0 ? window.masterDuration : 3.0;
                 op *= Math.min(1, (t * spd) / (d * 0.4));
             } else if (l.animPreset === 'fadeOut') {
-                const d = masterDuration > 0 ? masterDuration : 3.0;
+                const d = window.masterDuration > 0 ? window.masterDuration : 3.0;
                 op *= Math.max(0, 1 - (t * spd) / d);
             }
         }
@@ -308,55 +323,57 @@ function evaluateSceneAtTime(t, updateUI = false) {
                 l.mesh.material.uniforms.similarity.value = sim;
                 l.mesh.material.uniforms.smoothness.value = sm;
             }
-            updateLayerClippingAndOpacity(l, op);
+            if (window.updateLayerClippingAndOpacity) window.updateLayerClippingAndOpacity(l, op);
         }
 
-        if (updateUI && getPrimarySelectedItem()?.id === l.id) {
-            document.getElementById('posX').value = parseFloat(px.toFixed(3));
-            document.getElementById('posY').value = parseFloat(py.toFixed(3));
-            document.getElementById('posZ').value = parseFloat(pz.toFixed(3));
-            document.getElementById('scaleX').value = parseFloat(sx.toFixed(3));
-            document.getElementById('scaleY').value = parseFloat(sy.toFixed(3));
-            document.getElementById('scaleZ').value = parseFloat(sz.toFixed(3));
-            document.getElementById('rotX').value = parseFloat(rx.toFixed(1));
-            document.getElementById('rotY').value = parseFloat(ry.toFixed(1));
-            document.getElementById('rotZ').value = parseFloat(rz.toFixed(1));
-            document.getElementById('inpOpacity').value = op;
-            document.getElementById('opacityVal').textContent = op.toFixed(2);
+        if (updateUI && window.getPrimarySelectedItem && window.getPrimarySelectedItem()?.id === l.id) {
+            const elPosX = document.getElementById('posX'); if (elPosX) elPosX.value = parseFloat(px.toFixed(3));
+            const elPosY = document.getElementById('posY'); if (elPosY) elPosY.value = parseFloat(py.toFixed(3));
+            const elPosZ = document.getElementById('posZ'); if (elPosZ) elPosZ.value = parseFloat(pz.toFixed(3));
+            const elScaleX = document.getElementById('scaleX'); if (elScaleX) elScaleX.value = parseFloat(sx.toFixed(3));
+            const elScaleY = document.getElementById('scaleY'); if (elScaleY) elScaleY.value = parseFloat(sy.toFixed(3));
+            const elScaleZ = document.getElementById('scaleZ'); if (elScaleZ) elScaleZ.value = parseFloat(sz.toFixed(3));
+            const elRotX = document.getElementById('rotX'); if (elRotX) elRotX.value = parseFloat(rx.toFixed(1));
+            const elRotY = document.getElementById('rotY'); if (elRotY) elRotY.value = parseFloat(ry.toFixed(1));
+            const elRotZ = document.getElementById('rotZ'); if (elRotZ) elRotZ.value = parseFloat(rz.toFixed(1));
+            const elOp = document.getElementById('inpOpacity'); if (elOp) elOp.value = op;
+            const elOpVal = document.getElementById('opacityVal'); if (elOpVal) elOpVal.textContent = op.toFixed(2);
         }
     });
 }
 
-function animate() {
-    requestAnimationFrame(animate);
+window.animate = function() {
+    requestAnimationFrame(window.animate);
     const delta = clock.getDelta();
 
-    if (masterPlaying && masterDuration > 0) {
-        masterTime = (masterTime + delta) % masterDuration;
+    if (window.masterPlaying && window.masterDuration > 0) {
+        window.masterTime = (window.masterTime + delta) % window.masterDuration;
         const scrubber = document.getElementById('masterTimelineScrubber');
-        if (document.activeElement !== scrubber) scrubber.value = masterTime;
+        if (scrubber && document.activeElement !== scrubber) scrubber.value = window.masterTime;
     }
 
-    layers.forEach(l => { if (l.mixer && masterPlaying) l.mixer.update(delta); });
-    evaluateSceneAtTime(masterTime, false);
+    window.layers.forEach(l => { if (l.mixer && window.masterPlaying) l.mixer.update(delta); });
+    evaluateSceneAtTime(window.masterTime, false);
 
     const disp = document.getElementById('masterTimeDisplay');
-    disp.textContent = masterDuration > 0
-        ? `${masterTime.toFixed(2)}s / ${masterDuration.toFixed(2)}s`
-        : `00.00s / 00.00s [STATIC]`;
+    if (disp) {
+        disp.textContent = window.masterDuration > 0
+            ? `${window.masterTime.toFixed(2)}s / ${window.masterDuration.toFixed(2)}s`
+            : `00.00s / 00.00s [STATIC]`;
+    }
 
-    if (camAnim) {
-        camAnim.progress += 0.12;
-        if (camAnim.progress >= 1) {
-            camera.position.copy(camAnim.endPos);
-            orbit.target.copy(camAnim.endTarget);
-            camAnim = null;
+    if (window.camAnim) {
+        window.camAnim.progress += 0.12;
+        if (window.camAnim.progress >= 1) {
+            window.camera.position.copy(window.camAnim.endPos);
+            window.orbit.target.copy(window.camAnim.endTarget);
+            window.camAnim = null;
         } else {
-            camera.position.lerpVectors(camAnim.startPos, camAnim.endPos, camAnim.progress);
-            orbit.target.lerpVectors(camAnim.startTarget, camAnim.endTarget, camAnim.progress);
+            window.camera.position.lerpVectors(window.camAnim.startPos, window.camAnim.endPos, window.camAnim.progress);
+            window.orbit.target.lerpVectors(window.camAnim.startTarget, window.camAnim.endTarget, window.camAnim.progress);
         }
     }
 
-    orbit.update();
-    renderer.render(scene, camera);
-}
+    if (window.orbit) window.orbit.update();
+    if (window.renderer && window.scene && window.camera) window.renderer.render(window.scene, window.camera);
+};
