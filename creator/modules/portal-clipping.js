@@ -2,23 +2,21 @@
 // MODULE 03 // 4-PLANE PORTAL CLIPPING, CHROMA SHADER & MEDIA LAYER BUILDER (V7.4)
 // ============================================================================
 
-window.computeClippingPlanesForSource = function(clipSourceId) {
+function computeClippingPlanesForSource(clipSourceId) {
     if (!clipSourceId || clipSourceId === 'none') return null;
-    const slot = window.getActiveTargetSlot ? window.getActiveTargetSlot() : null;
-    if (!slot) return null;
-    
-    let refMatrix = window.targetMesh ? window.targetMesh.matrixWorld : new THREE.Matrix4();
+    const slot = getActiveTargetSlot();
+    let refMatrix = targetMesh.matrixWorld;
     let halfW = 0.5;
     let halfH = (slot && slot.targetAspect ? slot.targetAspect : 1.0) / 2;
 
     if (clipSourceId !== 'target') {
-        const maskLayer = window.layers.find(l => l.id === clipSourceId && l.isMaskPlane);
+        const maskLayer = layers.find(l => l.id === clipSourceId && l.isMaskPlane);
         if (!maskLayer || !maskLayer.mesh) return null;
         maskLayer.mesh.updateMatrixWorld(true);
         refMatrix = maskLayer.mesh.matrixWorld;
         halfW = 0.5; halfH = 0.5;
     } else {
-        if (window.targetMesh) window.targetMesh.updateMatrixWorld(true);
+        targetMesh.updateMatrixWorld(true);
     }
 
     return [
@@ -27,17 +25,17 @@ window.computeClippingPlanesForSource = function(clipSourceId) {
         new THREE.Plane(new THREE.Vector3( 0,  1, 0), halfH).applyMatrix4(refMatrix),
         new THREE.Plane(new THREE.Vector3( 0, -1, 0), halfH).applyMatrix4(refMatrix)
     ];
-};
+}
 
-window.updateLayerClippingAndOpacity = function(layer, effectiveOpacity) {
+function updateLayerClippingAndOpacity(layer, effectiveOpacity) {
     if (!layer.mesh || layer.isFolder || layer.isMaskPlane) return;
-    const planes = window.computeClippingPlanesForSource(layer.clipSource);
+    const planes = computeClippingPlanesForSource(layer.clipSource);
 
     layer.mesh.traverse(child => {
         if (child.isMesh && child.material) {
             child.material.clippingPlanes = planes;
             child.material.transparent = true;
-            
+
             // V7.4: Apply Optical Blend Modes to Studio Viewport Preview
             if (layer.blendMode === 'screen') {
                 child.material.blending = THREE.CustomBlending;
@@ -51,7 +49,6 @@ window.updateLayerClippingAndOpacity = function(layer, effectiveOpacity) {
             } else {
                 child.material.blending = THREE.NormalBlending;
             }
-            
             child.material.needsUpdate = true;
 
             if (child.material.uniforms && child.material.uniforms.opacity) {
@@ -70,9 +67,9 @@ window.updateLayerClippingAndOpacity = function(layer, effectiveOpacity) {
             }
         }
     });
-};
+}
 
-window.createChromaMaterial = function(texture, hexColor, similarity, smoothness, enabled) {
+function createChromaMaterial(texture, hexColor, similarity, smoothness, enabled) {
     return new THREE.ShaderMaterial({
         transparent: true,
         side: THREE.DoubleSide,
@@ -132,9 +129,9 @@ window.createChromaMaterial = function(texture, hexColor, similarity, smoothness
             '}'
         ].join('\n')
     });
-};
+}
 
-window.createPlaceholderTexture = function(label, isMask = false) {
+function createPlaceholderTexture(label, isMask = false) {
     const c = document.createElement('canvas');
     c.width = 512; c.height = 512;
     const ctx = c.getContext('2d');
@@ -152,9 +149,9 @@ window.createPlaceholderTexture = function(label, isMask = false) {
     ctx.font = '15px monospace';
     ctx.fillText(isMask ? 'INVISIBLE PORTAL CLIP WINDOW' : 'PASTE MEDIA LINK IN MOD-04', 256, 280);
     return new THREE.CanvasTexture(c);
-};
+}
 
-window.createLayerObject = function(cfg) {
+function createLayerObject(cfg) {
     const layer = {
         id: cfg.id,
         name: cfg.name,
@@ -198,14 +195,14 @@ window.createLayerObject = function(cfg) {
         grp.userData.layerId = layer.id;
         layer.mesh = grp;
     } else if (layer.isMaskPlane) {
-        const tex = window.createPlaceholderTexture(layer.name, true);
+        const tex = createPlaceholderTexture(layer.name, true);
         const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
         layer.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
         layer.mesh.userData.layerId = layer.id;
         layer.mesh.visible = layer.showMaskGuide;
     } else {
-        const tex = window.createPlaceholderTexture(layer.name, false);
-        const mat = window.createChromaMaterial(tex, layer.color, layer.similarity, layer.smoothness, false);
+        const tex = createPlaceholderTexture(layer.name, false);
+        const mat = createChromaMaterial(tex, layer.color, layer.similarity, layer.smoothness, false);
         layer.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
         layer.mesh.userData.layerId = layer.id;
     }
@@ -218,17 +215,17 @@ window.createLayerObject = function(cfg) {
         THREE.MathUtils.degToRad(layer.rot[2])
     );
 
-    if (window.scene) window.scene.add(layer.mesh);
+    scene.add(layer.mesh);
     return layer;
-};
+}
 
 window.addMediaLayer = function() {
-    const slot = window.getActiveTargetSlot ? window.getActiveTargetSlot() : null;
+    const slot = getActiveTargetSlot();
     const id = 'layer_' + Date.now();
-    const count = window.layers.filter(l => !l.isFolder && !l.isMaskPlane).length + 1;
-    const defaultPos = (slot && slot.mode === 'face' && window.FACE_ANCHOR_COORDS) ? [...window.FACE_ANCHOR_COORDS['168']] : [0, 0, 0];
+    const count = layers.filter(l => !l.isFolder && !l.isMaskPlane).length + 1;
+    const defaultPos = (slot && slot.mode === 'face') ? [...FACE_ANCHOR_COORDS['168']] : [0, 0, 0];
 
-    const layer = window.createLayerObject({
+    const layer = createLayerObject({
         id,
         name: `LAYER_${count}`,
         type: 'video',
@@ -239,17 +236,17 @@ window.addMediaLayer = function() {
         delay: 0,
         blendMode: 'normal'
     });
-    window.layers.push(layer);
-    if (window.selectSingleLayer) window.selectSingleLayer(id);
-    if (window.updateMasterDuration) window.updateMasterDuration();
-    if (window.saveHistoryState) window.saveHistoryState();
-    if (window.showToast) window.showToast(`➕ Added ${layer.name} at (${defaultPos.join(', ')})`);
+    layers.push(layer);
+    if (window.selectSingleLayer) selectSingleLayer(id);
+    if (window.updateMasterDuration) updateMasterDuration();
+    if (window.saveHistoryState) saveHistoryState();
+    showToast(`➕ Added ${layer.name} at (${defaultPos.join(', ')})`);
 };
 
 window.addClipMaskPlane = function() {
     const id = 'mask_' + Date.now();
-    const count = window.layers.filter(l => l.isMaskPlane).length + 1;
-    const maskLayer = window.createLayerObject({
+    const count = layers.filter(l => l.isMaskPlane).length + 1;
+    const maskLayer = createLayerObject({
         id,
         name: `MASK_PLANE_${count}`,
         isMaskPlane: true,
@@ -258,31 +255,30 @@ window.addClipMaskPlane = function() {
         scale: [1, 1, 1],
         rot: [0, 0, 0]
     });
-    window.layers.push(maskLayer);
-    if (window.selectSingleLayer) window.selectSingleLayer(id);
-    if (window.saveHistoryState) window.saveHistoryState();
-    if (window.showToast) window.showToast(`✂️ Added ${maskLayer.name}`);
+    layers.push(maskLayer);
+    if (window.selectSingleLayer) selectSingleLayer(id);
+    if (window.saveHistoryState) saveHistoryState();
+    showToast(`✂️ Added ${maskLayer.name}`);
 };
 
 window.syncMaskPlaneGuide = function() {
-    const layer = window.getPrimarySelectedItem ? window.getPrimarySelectedItem() : null;
+    const layer = getPrimarySelectedItem();
     if (!layer || !layer.isMaskPlane) return;
-    const toggle = document.getElementById('maskGuideToggle');
-    layer.showMaskGuide = toggle ? toggle.checked : true;
+    layer.showMaskGuide = document.getElementById('maskGuideToggle').checked;
     if (layer.mesh) layer.mesh.visible = layer.showMaskGuide;
 };
 
-window.detectMediaType = function(str) {
+function detectMediaType(str) {
     const s = str.split('?')[0].toLowerCase();
     if (s.endsWith('.glb') || s.endsWith('.gltf')) return 'glb';
     if (s.endsWith('.png') || s.endsWith('.jpg') || s.endsWith('.jpeg') || s.endsWith('.webp')) return 'image';
     return 'video';
-};
+}
 
-window.applyMediaToLayer = function(layer, mediaSourceUrl, fileHint = '', silent = false) {
+function applyMediaToLayer(layer, mediaSourceUrl, fileHint = '', silent = false) {
     if (!mediaSourceUrl || layer.isFolder || layer.isMaskPlane) return;
-    layer.type = window.detectMediaType(fileHint || layer.url || mediaSourceUrl);
-    const parentContainer = (layer.parentId && window.layers.find(l => l.id === layer.parentId)?.mesh) || window.scene;
+    layer.type = detectMediaType(fileHint || layer.url || mediaSourceUrl);
+    const parentContainer = (layer.parentId && layers.find(l => l.id === layer.parentId)?.mesh) || scene;
 
     if (layer.videoEl) { layer.videoEl.pause(); layer.videoEl.remove(); layer.videoEl = null; }
     if (layer.mixer) { layer.mixer.stopAllAction(); layer.mixer = null; layer.clips = []; }
@@ -293,14 +289,14 @@ window.applyMediaToLayer = function(layer, mediaSourceUrl, fileHint = '', silent
         vid.src = mediaSourceUrl;
         vid.loop = true; vid.muted = true; vid.playsInline = true;
         layer.videoEl = vid;
-        if (window.masterPlaying) vid.play().catch(() => {});
+        if (masterPlaying) vid.play().catch(() => {});
 
         const vidTex = new THREE.VideoTexture(vid);
         vidTex.minFilter = THREE.LinearFilter;
         vidTex.magFilter = THREE.LinearFilter;
 
         if (layer.mesh.isGroup) {
-            window.transformControl.detach();
+            transformControl.detach();
             parentContainer.remove(layer.mesh);
             layer.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial());
             layer.mesh.userData.layerId = layer.id;
@@ -313,13 +309,12 @@ window.applyMediaToLayer = function(layer, mediaSourceUrl, fileHint = '', silent
                 layer.mesh.geometry.dispose();
                 layer.mesh.geometry = new THREE.PlaneGeometry(1, vid.videoHeight / vid.videoWidth);
             }
-            if (window.updateMasterDuration) window.updateMasterDuration();
-            if (window.refreshInspectorUI) window.refreshInspectorUI();
-            if (!silent && window.showToast) window.showToast('🎬 Video Stream Locked');
+            if (window.updateMasterDuration) updateMasterDuration();
+            if (window.refreshInspectorUI) refreshInspectorUI();
+            if (!silent) showToast('🎬 Video Stream Locked');
         });
 
-        layer.mesh.material = window.createChromaMaterial(vidTex, layer.color, layer.similarity, layer.smoothness, layer.chromaEnabled);
-        window.updateLayerClippingAndOpacity(layer, layer.opacity ?? 1.0);
+        layer.mesh.material = createChromaMaterial(vidTex, layer.color, layer.similarity, layer.smoothness, layer.chromaEnabled);
 
     } else if (layer.type === 'image') {
         const img = new Image();
@@ -331,7 +326,7 @@ window.applyMediaToLayer = function(layer, mediaSourceUrl, fileHint = '', silent
             const aspect = img.height / img.width;
 
             if (layer.mesh.isGroup) {
-                window.transformControl.detach();
+                transformControl.detach();
                 parentContainer.remove(layer.mesh);
                 layer.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, aspect), new THREE.MeshBasicMaterial());
                 layer.mesh.userData.layerId = layer.id;
@@ -340,12 +335,11 @@ window.applyMediaToLayer = function(layer, mediaSourceUrl, fileHint = '', silent
                 layer.mesh.geometry.dispose();
                 layer.mesh.geometry = new THREE.PlaneGeometry(1, aspect);
             }
-            layer.mesh.material = window.createChromaMaterial(tex, layer.color, layer.similarity, layer.smoothness, layer.chromaEnabled);
-            window.updateLayerClippingAndOpacity(layer, layer.opacity ?? 1.0);
+            layer.mesh.material = createChromaMaterial(tex, layer.color, layer.similarity, layer.smoothness, layer.chromaEnabled);
             layer.duration = 0;
-            if (window.updateMasterDuration) window.updateMasterDuration();
-            if (window.refreshInspectorUI) window.refreshInspectorUI();
-            if (!silent && window.showToast) window.showToast('🖼️ Image Texture Loaded');
+            if (window.updateMasterDuration) updateMasterDuration();
+            if (window.refreshInspectorUI) refreshInspectorUI();
+            if (!silent) showToast('🖼️ Image Texture Loaded');
         };
         img.src = mediaSourceUrl;
 
@@ -353,7 +347,7 @@ window.applyMediaToLayer = function(layer, mediaSourceUrl, fileHint = '', silent
         const loader = new THREE.GLTFLoader();
         loader.setCrossOrigin('anonymous');
         loader.load(mediaSourceUrl, (gltf) => {
-            window.transformControl.detach();
+            transformControl.detach();
             parentContainer.remove(layer.mesh);
 
             const model = gltf.scene;
@@ -386,16 +380,16 @@ window.applyMediaToLayer = function(layer, mediaSourceUrl, fileHint = '', silent
                 layer.duration = 0;
             }
 
-            if (window.updateMasterDuration) window.updateMasterDuration();
-            if (window.selectedIds && window.selectedIds.includes(layer.id)) window.transformControl.attach(wrapper);
-            if (window.refreshInspectorUI) window.refreshInspectorUI();
-            if (!silent && window.showToast) window.showToast('🧊 3D .glb Mesh Loaded');
+            if (window.updateMasterDuration) updateMasterDuration();
+            if (selectedIds.includes(layer.id)) transformControl.attach(wrapper);
+            if (window.refreshInspectorUI) refreshInspectorUI();
+            if (!silent) showToast('🧊 3D .glb Mesh Loaded');
         });
     }
-};
+}
 
 window.changeGlbClip = function() {
-    const layer = window.getPrimarySelectedItem ? window.getPrimarySelectedItem() : null;
+    const layer = getPrimarySelectedItem();
     if (!layer || !layer.mixer || !layer.clips.length) return;
     const idx = parseInt(document.getElementById('glbClipSelect').value, 10) || 0;
     const clip = layer.clips[idx];
@@ -404,5 +398,5 @@ window.changeGlbClip = function() {
     layer.activeAction = layer.mixer.clipAction(clip);
     layer.activeAction.play();
     layer.duration = clip.duration || 0;
-    if (window.updateMasterDuration) window.updateMasterDuration();
+    if (window.updateMasterDuration) updateMasterDuration();
 };
