@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nizhali V7.4 | Creator Studio</title>
+    <link rel="stylesheet" href="./studio.css">
+    <script src="../vendor/aframe.min.js"></script>
+    <script src="../vendor/crypto-js.min.js"></script>
+</head>
+<body data-theme="default" data-mode="dark">
+
+    <!-- 1. GLOBAL HEADER -->
+    <header id="studio-top-bar" class="panel top-bar">
+        <div class="project-info">
+            <input type="text" id="project-name" value="Untitled Project" class="invisible-input">
+        </div>
+        <div class="project-actions">
+            <button id="btn-load-json" class="btn-secondary">📂 Load Project</button>
+            <button id="btn-save-json" class="btn-primary">💾 Save Workspace (.json)</button>
+            <div class="divider"></div>
+            <select id="theme-selector" class="theme-select">
+                <option value="default">Default Studio</option>
+                <option value="scifi">Sci-Fi Editor</option>
+            </select>
+            <button id="btn-toggle-mode" class="btn-icon" title="Toggle Light/Dark Mode">☀️</button>
+        </div>
+    </header>
+
+    <!-- 2. WORKSPACE -->
+    <main id="studio-workspace">
+        
+        <!-- LEFT PANEL -->
+        <aside id="left-sidebar" class="panel sidebar">
+            <div class="sidebar-section">
+                <h3>1. Tracking Setup</h3>
+                <label style="margin-top:0;">Tracker Type</label>
+                <select id="tracker-type-select" class="prop-input" style="margin-bottom: 12px;">
+                    <option value="image">Image Tracking (Posters, Cards)</option>
+                    <option value="face">Face Tracking (Filters, Masks)</option>
+                    <option value="object">Object/Body Tracking (Beta)</option>
+                </select>
+                <div class="upload-box" id="target-upload-box">
+                    <input type="file" id="target-upload-input" accept="image/*" hidden>
+                    <button id="btn-upload-target" class="btn-secondary w-100">Upload Target Reference</button>
+                    <img id="target-preview" style="display: none; width: 100%; margin-top: 12px; border-radius: var(--border-radius); border: 1px solid var(--border);">
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>2. Global Experience</h3>
+                <label class="checkbox-label" style="margin-top: 0;">
+                    <input type="checkbox" id="global-auto-light"> Enable Real-World Lighting
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="global-auto-audio"> Auto-Play Audio on Boot
+                </label>
+                <label>Target Loss Behavior</label>
+                <select id="global-loss-behavior" class="prop-input">
+                    <option value="fade">Smooth Fade Out</option>
+                    <option value="snap">Snap Disappear Instantly</option>
+                </select>
+                <div style="display: flex; gap: 12px; margin-top: 12px;">
+                    <div style="flex: 1;">
+                        <label style="margin-top: 0;">Loss Hold (sec)</label>
+                        <input type="number" id="global-loss-time" class="prop-input" step="0.1" min="0">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="margin-top: 0;">Max Targets</label>
+                        <input type="number" id="global-max-track" class="prop-input" min="1" max="3">
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>3. AR Layers</h3>
+                <div class="layer-add-grid">
+                    <button id="btn-add-folder" class="btn-outline" style="grid-column: span 3; margin-bottom: 8px;">📁 Add Group Folder</button>
+                    <button id="btn-add-video" class="btn-outline">🎥 Video</button>
+                    <button id="btn-add-image" class="btn-outline">🖼️ Image</button>
+                    <button id="btn-add-model" class="btn-outline">🧊 3D</button>
+                </div>
+                <ul id="layer-list" class="layer-list"></ul>
+            </div>
+        </aside>
+
+        <!-- CENTER PANEL -->
+        <section id="preview-stage" class="panel viewport-container" style="flex-direction: column;">
+            
+            <!-- Stage Toolbar -->
+            <div class="stage-toolbar" style="width: 100%; padding: 8px 12px; display: flex; justify-content: flex-end; gap: 12px; border-bottom: 1px solid var(--border);">
+                <button id="btn-toggle-magnet" class="btn-icon" title="Magnetic Snapping (On)" style="color: var(--accent);">🧲 Snapping</button>
+                <button id="btn-live-preview" class="btn-secondary" style="padding: 4px 12px;">🎥 Live Webcam Test</button>
+            </div>
+
+            <!-- Core Viewport -->
+            <div id="core-viewport" style="flex: 1; width: 100%; position: relative;">
+                <div class="viewport-placeholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                    <h2>Drop a target image to begin</h2>
+                </div>
+            </div>
+
+            <!-- Timeline Dock -->
+            <div id="timeline-dock" style="width: 100%; height: 180px; border-top: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg-panel);">
+                <div style="padding: 6px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 12px; font-weight: bold; color: var(--text-muted); text-transform: uppercase;">Timeline & Keyframes</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <label style="margin: 0;">Easing:</label>
+                        <select id="prop-easing" class="prop-input" style="width: auto; padding: 2px 6px; height: auto;">
+                            <option value="linear">Linear</option>
+                            <option value="ease">Easy Ease</option>
+                            <option value="ease-in">Ease In</option>
+                            <option value="ease-out">Ease Out</option>
+                            <option value="bezier">Custom Bézier</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="timeline-tracks" style="flex: 1; overflow-y: auto; padding: 12px; position: relative;">
+                    <p class="placeholder-text">Select a layer to view its animation timeline.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL -->
+        <aside id="right-sidebar" class="panel sidebar">
+            <div class="sidebar-section" id="properties-panel">
+                <h3>Layer Properties</h3>
+                <p class="placeholder-text" id="prop-empty-state">Select a layer to edit</p>
+                
+                <div id="layer-settings" style="display: none;">
+                    <label style="margin-top: 0;">Media Source URL</label>
+                    <input type="text" id="prop-url" class="prop-input" placeholder="Paste link here...">
+                    
+                    <div id="prop-playback-group" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+                        <label style="margin-top: 0;">Playback Rules</label>
+                        <select id="prop-playback" class="prop-input">
+                            <option value="loop">Loop Continuous</option>
+                            <option value="once-hide">Play Once & Hide</option>
+                            <option value="once-freeze">Play Once & Freeze</option>
+                        </select>
+                        <label>Autoplay Delay (sec)</label>
+                        <input type="number" id="prop-delay" class="prop-input" step="0.1" min="0" value="0">
+                    </div>
+
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label style="margin: 0;">Scale (X, Y, Z)</label>
+                            <button id="btn-lock-scale" class="btn-icon" title="Lock Proportions" style="color: var(--accent);">🔗</button>
+                        </div>
+                        <div class="coord-grid" style="margin-top: 6px;">
+                            <input type="number" id="prop-scale-x" step="0.05" placeholder="X" value="1.0">
+                            <input type="number" id="prop-scale-y" step="0.05" placeholder="Y" value="1.0">
+                            <input type="number" id="prop-scale-z" step="0.05" placeholder="Z" value="1.0">
+                        </div>
+                        <label>Position (X, Y, Z)</label>
+                        <div class="coord-grid">
+                            <input type="number" id="prop-pos-x" step="0.1" placeholder="X" value="0">
+                            <input type="number" id="prop-pos-y" step="0.1" placeholder="Y" value="0">
+                            <input type="number" id="prop-pos-z" step="0.1" placeholder="Z" value="0">
+                        </div>
+                        <label>Rotation (X, Y, Z)</label>
+                        <div class="coord-grid">
+                            <input type="number" id="prop-rot-x" step="1" placeholder="X" value="0">
+                            <input type="number" id="prop-rot-y" step="1" placeholder="Y" value="0">
+                            <input type="number" id="prop-rot-z" step="1" placeholder="Z" value="0">
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+                        <label style="margin-top: 0;">Optical Blend Mode</label>
+                        <select id="prop-blend" class="prop-input">
+                            <option value="normal">Normal</option>
+                            <option value="screen">Screen (Drops Black)</option>
+                            <option value="multiply">Multiply (Drops White)</option>
+                            <option value="additive">Additive (Glowing)</option>
+                        </select>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="prop-chroma"> Enable Green Screen
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+    </main>
+
+    <!-- 3. PUBLISH DECK -->
+    <footer id="studio-publish-deck" class="panel bottom-bar">
+        <div class="publish-info">
+            <p>Ready to deploy? Compile your tracker and generate the link.</p>
+        </div>
+        <div class="publish-actions">
+            <button id="btn-compile-mind" class="btn-secondary">⚙️ Compile Target (.mind)</button>
+            <button id="btn-generate-link" class="btn-primary">🚀 Generate Player Link</button>
+        </div>
+    </footer>
+
+    <!-- SCRIPTS -->
+    <script>
+        const body = document.body;
+        document.getElementById('theme-selector').addEventListener('change', (e) => body.setAttribute('data-theme', e.target.value));
+        document.getElementById('btn-toggle-mode').addEventListener('click', () => {
+            const newMode = body.getAttribute('data-mode') === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-mode', newMode);
+            document.getElementById('btn-toggle-mode').textContent = newMode === 'dark' ? '☀️' : '🌙';
+        });
+        
+        let scaleLocked = true;
+        document.getElementById('btn-lock-scale').addEventListener('click', (e) => {
+            scaleLocked = !scaleLocked;
+            e.target.style.opacity = scaleLocked ? '1' : '0.4';
+            e.target.style.color = scaleLocked ? 'var(--accent)' : 'var(--text-muted)';
+        });
+
+        let magnetOn = true;
+        document.getElementById('btn-toggle-magnet').addEventListener('click', (e) => {
+            magnetOn = !magnetOn;
+            e.target.style.opacity = magnetOn ? '1' : '0.4';
+            e.target.style.color = magnetOn ? 'var(--accent)' : 'var(--text-muted)';
+        });
+    </script>
+    <script src="./modules/dropbox-crypto.js"></script>
+    <script src="./modules/tracker-3d-epnp.js"></script>
+    <script src="./modules/portal-clipping.js"></script>
+    <script src="./modules/timeline-keyframes.js"></script>
+    <script src="./modules/core-viewport.js"></script>
+    <script src="./modules/studio-main.js"></script>
+</body>
+</html>

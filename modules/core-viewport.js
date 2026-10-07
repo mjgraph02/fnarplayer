@@ -1,160 +1,225 @@
 // ============================================================================
-// MODULE 01 // CORE THREE.JS VIEWPORT, STAGE REFERENCES & PROJECT STATE
+// CREATOR MODULE // CORE VIEWPORT & LAYER MANAGER
 // ============================================================================
 
-const container = document.getElementById('viewport-container');
-const canvas = document.getElementById('webgl-canvas');
+(function() {
+    let activeLayerId = null;
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d0d0c);
+    // 1. ADD NEW LAYER TO STATE
+    function createLayer(type) {
+        const id = 'layer_' + Date.now();
+        const layerCount = window.NizhaliProject.targets[0].layers.length + 1;
+        
+        const newLayer = {
+            id: id,
+            name: `${type.toUpperCase()} ${layerCount}`,
+            type: type, // video, image, model, folder
+            url: "",
+            transform: {
+                pos: { x:0, y:0, z:0 },
+                rot: { x:0, y:0, z:0 },
+                scale: { x:1, y:1, z:1 }
+            },
+            playback: { rule: "loop", delay: 0 },
+            render: { blendMode: "normal", chromaKey: false }
+        };
+        
+        window.NizhaliProject.targets[0].layers.unshift(newLayer); // Add to top of list
+        window.autoSaveProject();
+        
+        selectLayer(id);
+    }
 
-const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.01, 100);
-camera.position.set(0, -1.1, 1.5);
+    // 2. RENDER THE UI (SIDEBAR LIST & VIEWPORT CANVAS)
+    function refreshUI() {
+        const listEl = document.getElementById('layer-list');
+        const viewportEl = document.getElementById('core-viewport');
+        const layers = window.NizhaliProject.targets[0].layers;
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
-renderer.setSize(container.clientWidth, container.clientHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.outputEncoding = THREE.sRGBEncoding;
-renderer.localClippingEnabled = true;
+        listEl.innerHTML = '';
+        
+        if (layers.length === 0) {
+            viewportEl.innerHTML = `<div class="viewport-placeholder" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);"><h2>Drop a target image to begin</h2></div>`;
+            document.getElementById('prop-empty-state').style.display = 'block';
+            document.getElementById('layer-settings').style.display = 'none';
+            return;
+        }
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
-scene.add(ambientLight);
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
-dirLight.position.set(2, 2, 4);
-scene.add(dirLight);
+        viewportEl.innerHTML = ''; // Clear canvas
 
-const gridHelper = new THREE.GridHelper(4, 40, 0x383632, 0x1e1d1a);
-gridHelper.rotation.x = Math.PI / 2;
-gridHelper.position.z = -0.005;
-scene.add(gridHelper);
+        layers.forEach((layer) => {
+            // A. Sidebar List Item
+            const li = document.createElement('li');
+            li.style.padding = "10px";
+            li.style.marginBottom = "6px";
+            li.style.backgroundColor = layer.id === activeLayerId ? "var(--border)" : "var(--bg-main)";
+            li.style.border = layer.id === activeLayerId ? "1px solid var(--accent)" : "1px solid var(--border)";
+            li.style.borderRadius = "var(--border-radius)";
+            li.style.cursor = "pointer";
+            li.style.display = "flex";
+            li.style.justifyContent = "space-between";
+            li.style.alignItems = "center";
+            
+            const icon = layer.type === 'video' ? '🎥' : layer.type === 'image' ? '🖼️' : layer.type === 'folder' ? '📁' : '🧊';
+            li.innerHTML = `
+                <span style="font-weight: ${layer.id === activeLayerId ? 'bold' : 'normal'}; color: ${layer.id === activeLayerId ? 'var(--accent)' : 'inherit'};">${icon} ${layer.name}</span> 
+                <button class="btn-icon" data-delete="${layer.id}" title="Delete Layer" style="color:#ff4444; font-size: 11px;">✖</button>
+            `;
+            
+            li.onclick = (e) => {
+                if(!e.target.dataset.delete) selectLayer(layer.id);
+            };
+            listEl.appendChild(li);
 
-// Stage Reference Group (Swaps between Print Floor, 3D Toy .glb, and Face AR Mannequin)
-const stageReferenceGroup = new THREE.Group();
-scene.add(stageReferenceGroup);
+            // B. Center Viewport Element (Visual Representation)
+            if (layer.type !== 'folder') {
+                const vis = document.createElement('div');
+                vis.style.position = 'absolute';
+                
+                // Map the abstract coordinates to visual pixels for the 2D stage
+                // Base coordinate (0,0) is center. Scale translates directly.
+                vis.style.left = `calc(50% + ${layer.transform.pos.x * 100}px)`;
+                vis.style.top = `calc(50% - ${layer.transform.pos.y * 100}px)`; // -y because browser Y goes down
+                vis.style.transform = `translate(-50%, -50%) scale(${layer.transform.scale.x}) rotate(${layer.transform.rot.z}deg)`;
+                
+                vis.style.border = layer.id === activeLayerId ? "2px solid var(--accent)" : "1px dashed rgba(255,255,255,0.3)";
+                vis.style.backgroundColor = layer.id === activeLayerId ? "rgba(0, 255, 136, 0.1)" : "rgba(255, 255, 255, 0.05)";
+                vis.style.padding = "40px";
+                vis.style.borderRadius = "8px";
+                vis.style.cursor = "grab";
+                vis.style.display = "flex";
+                vis.style.alignItems = "center";
+                vis.style.justifyContent = "center";
+                vis.style.fontSize = "24px";
+                
+                vis.innerHTML = icon;
+                vis.onclick = () => selectLayer(layer.id);
+                
+                // Keep selected layer on top
+                vis.style.zIndex = layer.id === activeLayerId ? 100 : 10;
+                
+                viewportEl.appendChild(vis);
+            }
+        });
 
-// 1A. Default Print Target Plane
-const placeholderCanvas = document.createElement('canvas');
-placeholderCanvas.width = 512; placeholderCanvas.height = 512;
-const pCtx = placeholderCanvas.getContext('2d');
-pCtx.fillStyle = '#181816'; pCtx.fillRect(0, 0, 512, 512);
-pCtx.strokeStyle = '#ff4f00'; pCtx.lineWidth = 10; pCtx.strokeRect(5, 5, 502, 502);
-pCtx.fillStyle = '#ffb800'; pCtx.font = 'bold 24px monospace'; pCtx.textAlign = 'center';
-pCtx.fillText('PRINT TARGET FLOOR [Z=0]', 256, 240);
-pCtx.fillStyle = '#9c988e'; pCtx.font = '15px monospace';
-pCtx.fillText('Upload or Paste Print Link in MOD-01', 256, 275);
+        // Delete Layer Logic
+        document.querySelectorAll('button[data-delete]').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const idToRemove = e.target.dataset.delete;
+                window.NizhaliProject.targets[0].layers = window.NizhaliProject.targets[0].layers.filter(l => l.id !== idToRemove);
+                if(activeLayerId === idToRemove) activeLayerId = null;
+                window.autoSaveProject();
+                refreshUI();
+            }
+        });
+    }
 
-const defaultTargetTex = new THREE.CanvasTexture(placeholderCanvas);
-const targetMat = new THREE.MeshBasicMaterial({ map: defaultTargetTex, side: THREE.DoubleSide });
-const targetMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), targetMat);
-stageReferenceGroup.add(targetMesh);
+    // 3. SELECT ACTIVE LAYER & FILL RIGHT SIDEBAR
+    function selectLayer(id) {
+        activeLayerId = id;
+        refreshUI(); // Highlight in list and viewport
 
-// 1B. 3D Face AR Reference Head Mannequin (Built procedurally with Anchor Guide Dots!)
-const faceMannequinGroup = new THREE.Group();
-faceMannequinGroup.visible = false;
-(function buildFaceMannequin() {
-    const headMat = new THREE.MeshStandardMaterial({ color: 0x383632, roughness: 0.6, metalness: 0.1 });
-    const headGeo = new THREE.SphereGeometry(0.36, 32, 24);
-    headGeo.scale(0.82, 1.08, 0.9);
-    const headMesh = new THREE.Mesh(headGeo, headMat);
-    faceMannequinGroup.add(headMesh);
+        const layer = window.NizhaliProject.targets[0].layers.find(l => l.id === id);
+        if(!layer) return;
 
-    const noseMesh = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 4), headMat);
-    noseMesh.rotation.x = Math.PI / 2;
-    noseMesh.position.set(0, 0.02, 0.34);
-    faceMannequinGroup.add(noseMesh);
+        document.getElementById('prop-empty-state').style.display = 'none';
+        document.getElementById('layer-settings').style.display = 'block';
 
-    const earGeo = new THREE.SphereGeometry(0.07, 16, 12);
-    earGeo.scale(0.4, 1.0, 0.6);
-    const leftEar = new THREE.Mesh(earGeo, headMat);
-    leftEar.position.set(-0.31, 0, 0.02);
-    const rightEar = new THREE.Mesh(earGeo, headMat);
-    rightEar.position.set(0.31, 0, 0.02);
-    faceMannequinGroup.add(leftEar, rightEar);
+        // Populate properties
+        document.getElementById('prop-url').value = layer.url || "";
+        document.getElementById('prop-playback').value = layer.playback.rule;
+        document.getElementById('prop-delay').value = layer.playback.delay;
+        
+        document.getElementById('prop-scale-x').value = layer.transform.scale.x;
+        document.getElementById('prop-scale-y').value = layer.transform.scale.y;
+        document.getElementById('prop-scale-z').value = layer.transform.scale.z;
+        
+        document.getElementById('prop-pos-x').value = layer.transform.pos.x;
+        document.getElementById('prop-pos-y').value = layer.transform.pos.y;
+        document.getElementById('prop-pos-z').value = layer.transform.pos.z;
 
-    const neckMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.35, 20), headMat);
-    neckMesh.position.set(0, -0.42, -0.04);
-    faceMannequinGroup.add(neckMesh);
+        document.getElementById('prop-rot-x').value = layer.transform.rot.x;
+        document.getElementById('prop-rot-y').value = layer.transform.rot.y;
+        document.getElementById('prop-rot-z').value = layer.transform.rot.z;
 
-    const dotMat = new THREE.MeshBasicMaterial({ color: 0x00d2ff });
-    const anchors = [
-        [0, 0.08, 0.33],      // 168: Nose Bridge (Glasses)
-        [0, 0.28, 0.28],      // 10: Forehead (Bindi / Hat)
-        [-0.32, -0.05, 0.04], // 234: Left Ear
-        [0.32, -0.05, 0.04],  // 454: Right Ear
-        [0, -0.36, 0.14],     // 152: Chin / Neck
-        [0, -0.04, 0.36]      // 1: Nose Tip / Mouth
-    ];
-    anchors.forEach(pos => {
-        const d = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 12), dotMat);
-        d.position.set(...pos);
-        faceMannequinGroup.add(d);
+        document.getElementById('prop-blend').value = layer.render.blendMode;
+        document.getElementById('prop-chroma').checked = layer.render.chromaKey;
+        
+        // Hide playback rules if it's an image
+        document.getElementById('prop-playback-group').style.display = layer.type === 'video' ? 'block' : 'none';
+    }
+
+    // 4. BIND UI LISTENERS TO UPDATE STATE
+    function bindEvents() {
+        document.getElementById('btn-add-video')?.addEventListener('click', () => createLayer('video'));
+        document.getElementById('btn-add-image')?.addEventListener('click', () => createLayer('image'));
+        document.getElementById('btn-add-model')?.addEventListener('click', () => createLayer('model'));
+        document.getElementById('btn-add-folder')?.addEventListener('click', () => createLayer('folder'));
+
+        const propIds = [
+            'prop-url', 'prop-playback', 'prop-delay', 
+            'prop-scale-x', 'prop-scale-y', 'prop-scale-z',
+            'prop-pos-x', 'prop-pos-y', 'prop-pos-z',
+            'prop-rot-x', 'prop-rot-y', 'prop-rot-z',
+            'prop-blend', 'prop-chroma'
+        ];
+        
+        propIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', () => {
+                    if (!activeLayerId) return;
+                    const layer = window.NizhaliProject.targets[0].layers.find(l => l.id === activeLayerId);
+                    if (!layer) return;
+
+                    // Write properties to state
+                    if(id === 'prop-url') layer.url = el.value;
+                    if(id === 'prop-playback') layer.playback.rule = el.value;
+                    if(id === 'prop-delay') layer.playback.delay = parseFloat(el.value) || 0;
+                    if(id === 'prop-scale-x') layer.transform.scale.x = parseFloat(el.value) || 1;
+                    if(id === 'prop-scale-y') layer.transform.scale.y = parseFloat(el.value) || 1;
+                    if(id === 'prop-scale-z') layer.transform.scale.z = parseFloat(el.value) || 1;
+                    if(id === 'prop-pos-x') layer.transform.pos.x = parseFloat(el.value) || 0;
+                    if(id === 'prop-pos-y') layer.transform.pos.y = parseFloat(el.value) || 0;
+                    if(id === 'prop-pos-z') layer.transform.pos.z = parseFloat(el.value) || 0;
+                    if(id === 'prop-rot-x') layer.transform.rot.x = parseFloat(el.value) || 0;
+                    if(id === 'prop-rot-y') layer.transform.rot.y = parseFloat(el.value) || 0;
+                    if(id === 'prop-rot-z') layer.transform.rot.z = parseFloat(el.value) || 0;
+                    if(id === 'prop-blend') layer.render.blendMode = el.value;
+                    if(id === 'prop-chroma') layer.render.chromaKey = el.checked;
+
+                    // If scale is locked visually via the button, enforce uniform scaling
+                    const lockBtn = document.getElementById('btn-lock-scale');
+                    if (lockBtn && lockBtn.style.opacity !== '0.4' && id.startsWith('prop-scale-')) {
+                        const val = parseFloat(el.value) || 1;
+                        layer.transform.scale.x = val;
+                        layer.transform.scale.y = val;
+                        layer.transform.scale.z = val;
+                        document.getElementById('prop-scale-x').value = val;
+                        document.getElementById('prop-scale-y').value = val;
+                        document.getElementById('prop-scale-z').value = val;
+                    }
+
+                    window.autoSaveProject();
+                    refreshUI(); // Update viewport instantly so changes are visible
+                });
+            }
+        });
+    }
+
+    // 5. INIT
+    window.addEventListener('DOMContentLoaded', () => {
+        // Slight delay ensures the autosave loaded correctly from studio-main.js first
+        setTimeout(() => {
+            bindEvents();
+            refreshUI();
+            
+            // If layers exist from a loaded save, select the first one by default
+            if(window.NizhaliProject.targets[0].layers.length > 0) {
+                selectLayer(window.NizhaliProject.targets[0].layers[0].id);
+            }
+        }, 150); 
     });
+
 })();
-stageReferenceGroup.add(faceMannequinGroup);
-
-// 1C. 3D Toy Photogrammetry Target Holder
-const toyTargetHolder = new THREE.Group();
-toyTargetHolder.visible = false;
-stageReferenceGroup.add(toyTargetHolder);
-
-// OrbitControls & TransformControls
-const orbit = new THREE.OrbitControls(camera, renderer.domElement);
-orbit.enableDamping = true;
-orbit.dampingFactor = 0.08;
-orbit.screenSpacePanning = true;
-
-const transformControl = new THREE.TransformControls(camera, renderer.domElement);
-transformControl.setSize(0.85);
-scene.add(transformControl);
-
-// Shared Studio Project State
-let projectState = {
-    projectName: 'Nizhali_Project_01',
-    mindUrl: '',
-    activeTargetIndex: 0,
-    targetIndexMap: [],
-    targets: []
-};
-
-let layers = [];
-let selectedIds = [];
-let lastClickedId = null;
-let autoKeyEnabled = false;
-let masterTime = 0;
-let masterDuration = 0;
-let masterPlaying = true;
-let camAnim = null;
-
-const FACE_ANCHOR_COORDS = {
-    '168': [0, 0.08, 0.33],
-    '10':  [0, 0.28, 0.28],
-    '234': [-0.32, -0.05, 0.04],
-    '454': [0.32, -0.05, 0.04],
-    '152': [0, -0.36, 0.14],
-    '1':   [0, -0.04, 0.36]
-};
-
-function cleanDropbox(u) {
-    if (!u) return '';
-    const d1 = ['www', 'dropbox', 'com'].join('.');
-    const d2 = ['dl', 'dropboxusercontent', 'com'].join('.');
-    return u.trim().replace(d1, d2).replace('dropbox.com', d2).replace(/[?&]dl=[01]/g, '');
-}
-
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    if (!t) return;
-    t.textContent = msg;
-    t.style.display = 'block';
-    clearTimeout(window._toastTimer);
-    window._toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3200);
-}
-
-function getActiveTargetSlot() {
-    return projectState.targets[projectState.activeTargetIndex];
-}
-
-function getPrimarySelectedItem() {
-    if (selectedIds.length === 0) return null;
-    return layers.find(l => l.id === selectedIds[selectedIds.length - 1]) || null;
-}
