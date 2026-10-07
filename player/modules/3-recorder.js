@@ -1,5 +1,5 @@
 // ============================================================================
-// PLAYER MODULE 03 // SNAPCHAT GESTURE RECORDER & 60FPS COMPOSITOR
+// PLAYER MODULE 03 // SNAPCHAT GESTURE RECORDER & BULLETPROOF MOBILE SAVING
 // ============================================================================
 
 (function() {
@@ -37,7 +37,6 @@
     const btnDownload = document.getElementById('btn-download');
     const btnShare = document.getElementById('btn-share');
 
-    // Reliably locate the A-Frame WebGL canvas
     function getWebGlCanvas() {
         const sceneEl = document.getElementById('ar-scene');
         if (sceneEl && sceneEl.canvas) return sceneEl.canvas;
@@ -45,14 +44,11 @@
         return document.querySelector('canvas.a-canvas') || document.querySelector('canvas');
     }
 
-    // Reliably locate the live MindAR camera <video> feed
     function getCameraVideo() {
         const allVids = Array.from(document.querySelectorAll('video'));
-        // 1. Prefer any video with an active MediaStream (camera srcObject)
         for (let v of allVids) {
             if (v.srcObject) return v;
         }
-        // 2. Fallback: direct child of body or video without a remote http src
         for (let v of allVids) {
             if (!v.src || v.parentElement === document.body) return v;
         }
@@ -84,14 +80,12 @@
         }
     }
 
-    // High-Res Single Snapshot
     function capturePhoto() {
         if (navigator.vibrate) navigator.vibrate(35);
         const camVideo = getCameraVideo();
         const glCanvas = getWebGlCanvas();
         if (!glCanvas && !camVideo) return;
 
-        // Visual flash feedback on shutter button
         shutterBtn.style.transform = 'scale(0.82)';
         setTimeout(() => { shutterBtn.style.transform = ''; }, 140);
 
@@ -110,13 +104,11 @@
         }, 'image/jpeg', 0.95);
     }
 
-    // 60fps Video Compositor Loop
     function startCompositor(camVideo, glCanvas) {
         if (!compCanvas) {
             compCanvas = document.createElement('canvas');
             compCtx = compCanvas.getContext('2d', { alpha: false });
         }
-        // Keep recording resolution crisp & smooth on mobile (720p max width)
         const aspect = window.innerHeight / window.innerWidth;
         compCanvas.width = 720;
         compCanvas.height = Math.round(720 * aspect);
@@ -143,9 +135,10 @@
         if (navigator.vibrate) navigator.vibrate(55);
 
         startCompositor(camVideo, glCanvas);
-        const canvasStream = compCanvas.captureStream(30);
+        
+        // 30fps is safer for mobile web encoders than 60fps
+        const canvasStream = compCanvas.captureStream(30); 
 
-        // Capture live audio from AR video layers if unmuted
         try {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             if (audioContext.state === 'suspended') audioContext.resume();
@@ -166,41 +159,33 @@
             if (audioTracks.length > 0) canvasStream.addTrack(audioTracks[0]);
         } catch (e) {}
 
-        const mimeTypes = [
-            'video/mp4',
-            'video/webm;codecs=vp9,opus',
-            'video/webm;codecs=vp8,opus',
-            'video/webm'
-        ];
-        let chosenMime = '';
-        if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
-            for (let m of mimeTypes) {
-                if (MediaRecorder.isTypeSupported(m)) {
-                    chosenMime = m;
-                    break;
-                }
-            }
-        }
-
+        // Removed strict bitrate limits that crashed iOS Safari
         try {
-            mediaRecorder = chosenMime
-                ? new MediaRecorder(canvasStream, { mimeType: chosenMime, videoBitsPerSecond: 4500000 })
-                : new MediaRecorder(canvasStream);
-        } catch (err) {
             mediaRecorder = new MediaRecorder(canvasStream);
+        } catch (err) {
+            console.error("MediaRecorder init failed", err);
+            return; 
         }
 
         mediaRecorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+            if (e.data && e.data.size > 0) {
+                recordedChunks.push(e.data);
+            }
         };
 
         mediaRecorder.onstop = () => {
             cancelAnimationFrame(compAnimFrame);
-            const blob = new Blob(recordedChunks, { type: (mediaRecorder && mediaRecorder.mimeType) || 'video/mp4' });
+            if (recordedChunks.length === 0) {
+                // FALLBACK: If phone video encoder fails, save a photo instead of doing nothing!
+                capturePhoto();
+                return;
+            }
+            const blob = new Blob(recordedChunks, { type: (mediaRecorder.mimeType || 'video/mp4') });
             if (blob.size > 0) showPreview(blob, 'video');
         };
 
-        mediaRecorder.start(200);
+        // Request data frequently so iOS doesn't drop the buffer
+        mediaRecorder.start(200); 
         recordStartTime = performance.now();
         shutterWrap.classList.add('recording');
         if (gestureHint) gestureHint.style.opacity = '0';
@@ -245,7 +230,6 @@
 
     function setZoom(val) {
         currentZoom = Math.min(2.5, Math.max(1.0, val));
-        // Zoom both camera video and 3D AR scene smoothly together
         const camVideo = getCameraVideo();
         const glCanvas = getWebGlCanvas();
         const scaleStr = currentZoom > 1.01 ? `scale(${currentZoom.toFixed(3)})` : '';
@@ -266,31 +250,19 @@
         setTimeout(() => zoomInd.classList.remove('visible'), 500);
     }
 
-    // Unified Mobile Touch + Desktop Mouse Gesture Handlers
-    function getCoords(e) {
-        if (e.touches && e.touches.length > 0) {
-            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        }
-        if (e.changedTouches && e.changedTouches.length > 0) {
-            return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
-        }
-        return { x: e.clientX, y: e.clientY };
-    }
-
-    function handleDown(e) {
-        if (e.cancelable) e.preventDefault();
-        e.stopPropagation();
-
-        // If already locked in hands-free recording, tapping stops recording!
+    // Bulletproof Mobile Touch / Pointer Handlers
+    function handlePointerDown(e) {
+        if (e.cancelable) e.preventDefault(); 
+        
+        // Tap to stop if locked
         if (isRecording && isLocked) {
             stopVideoRecording();
             return;
         }
 
         isPressActive = true;
-        const pt = getCoords(e);
-        startX = pt.x;
-        startY = pt.y;
+        startX = e.clientX || (e.touches && e.touches[0].clientX);
+        startY = e.clientY || (e.touches && e.touches[0].clientY);
 
         clearTimeout(pressTimer);
         pressTimer = setTimeout(() => {
@@ -301,14 +273,16 @@
         }, 260);
     }
 
-    function handleMove(e) {
+    function handlePointerMove(e) {
         if (!isPressActive && !isRecording) return;
-        const pt = getCoords(e);
-        const dx = pt.x - startX;
-        const dy = startY - pt.y; // positive = finger slid UP
+        const curX = e.clientX || (e.touches && e.touches[0].clientX);
+        const curY = e.clientY || (e.touches && e.touches[0].clientY);
+        
+        const dx = curX - startX;
+        const dy = startY - curY; // Up is positive
 
         if (isRecording) {
-            // Slide Left to Lock Hands-Free
+            // Slide Left to Lock
             if (dx < -45 && !isLocked) {
                 isLocked = true;
                 lockPill.classList.add('locked');
@@ -324,12 +298,11 @@
         }
     }
 
-    function handleUp(e) {
+    function handlePointerUp(e) {
         if (!isPressActive) return;
-        if (e && e.cancelable) e.preventDefault();
         isPressActive = false;
 
-        // Quick tap (< 260ms) -> Photo Snapshot
+        // Photo Tap
         if (pressTimer) {
             clearTimeout(pressTimer);
             pressTimer = null;
@@ -337,22 +310,20 @@
             return;
         }
 
-        // Released finger while recording (and not locked) -> Stop Video
+        // Released finger while holding video
         if (isRecording && !isLocked) {
             stopVideoRecording();
         }
     }
 
-    // Bind both Touch and Mouse events cleanly
-    shutterWrap.addEventListener('touchstart', handleDown, { passive: false });
-    window.addEventListener('touchmove', handleMove, { passive: false });
-    window.addEventListener('touchend', handleUp, { passive: false });
+    // Use pure Pointer Events for modern mobile/desktop sync (No touchcancel swallowed)
+    shutterWrap.style.touchAction = 'none'; // Critical for pointer events
+    shutterWrap.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
 
-    shutterWrap.addEventListener('mousedown', handleDown);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-
-    // Preview, Share & Direct Download Modal
+    // Preview & Save
     function showPreview(blob, type) {
         previewBox.innerHTML = '';
         const url = URL.createObjectURL(blob);
@@ -391,12 +362,8 @@
                 if (navigator.canShare({ files: [file] })) {
                     btnShare.style.display = 'block';
                     btnShare.onclick = async () => {
-                        try {
-                            await navigator.share({
-                                title: 'Nizhali AR Capture',
-                                files: [file]
-                            });
-                        } catch (e) {}
+                        try { await navigator.share({ title: 'Nizhali AR', files: [file] }); } 
+                        catch (e) {}
                     };
                 }
             } catch (e) {}

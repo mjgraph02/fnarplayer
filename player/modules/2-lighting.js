@@ -13,11 +13,13 @@
     let cameraVideoEl = null;
     let sampleInterval = null;
 
+    // Reliably find the live MindAR camera feed
     function findCameraVideo() {
         if (cameraVideoEl && cameraVideoEl.readyState >= 2) return cameraVideoEl;
-        const vids = document.querySelectorAll('body > video');
-        for (let v of vids) {
-            if (v.srcObject || v.videoWidth > 0) {
+        const allVids = document.querySelectorAll('video');
+        for (let v of allVids) {
+            // The actual phone camera will have a live MediaStream (srcObject)
+            if (v.srcObject) {
                 cameraVideoEl = v;
                 return cameraVideoEl;
             }
@@ -49,18 +51,18 @@
             // Perceived luminance (Rec. 709)
             const luma = 0.2126 * avgR + 0.7152 * avgG + 0.0722 * avgB;
 
-            // Map luma to a balanced brightness range (0.55 = dim room, 1.25 = bright room)
-            const intensity = Math.min(1.25, Math.max(0.55, 0.45 + luma * 1.1));
+            // WIDER DYNAMIC RANGE: 0.3 (Very Dark) to 1.4 (Very Bright)
+            const intensity = Math.min(1.4, Math.max(0.3, 0.2 + luma * 1.5));
 
-            // Calculate subtle color temperature shift (warm indoor vs cool daylight)
+            // Stronger Color Temperature Shift (Warm indoor vs Cool daylight)
             const avgGray = (avgR + avgG + avgB) / 3 || 0.001;
-            const normR = Math.min(1.2, Math.max(0.8, avgR / avgGray));
-            const normG = Math.min(1.2, Math.max(0.8, avgG / avgGray));
-            const normB = Math.min(1.2, Math.max(0.8, avgB / avgGray));
+            const normR = Math.min(1.4, Math.max(0.7, avgR / avgGray));
+            const normG = Math.min(1.4, Math.max(0.7, avgG / avgGray));
+            const normB = Math.min(1.4, Math.max(0.7, avgB / avgGray));
 
-            targetR = intensity * (0.8 + normR * 0.2);
-            targetG = intensity * (0.8 + normG * 0.2);
-            targetB = intensity * (0.8 + normB * 0.2);
+            targetR = intensity * (0.65 + normR * 0.35);
+            targetG = intensity * (0.65 + normG * 0.35);
+            targetB = intensity * (0.65 + normB * 0.35);
         } catch (e) {
             // Video stream not ready yet
         }
@@ -70,6 +72,7 @@
     function stepLightingLerp() {
         requestAnimationFrame(stepLightingLerp);
         if (!window.NizhaliPlayer.autoLightEnabled) {
+            // If turned off, smoothly return to pure 1.0 white studio lighting
             currentR += (1.0 - currentR) * 0.1;
             currentG += (1.0 - currentG) * 0.1;
             currentB += (1.0 - currentB) * 0.1;

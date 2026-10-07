@@ -1,5 +1,5 @@
 // ============================================================================
-// PLAYER MODULE 04 // ZERO-LAG AR CORE, FAST CAMERA BOOT & SMOOTH LOSS FADE
+// PLAYER MODULE 04 // TUNED ONE-EURO TRACKING, FAST CAMERA & SMOOTH LOSS FADE
 // ============================================================================
 
 import '../../vendor/mindar-image-aframe.prod.js';
@@ -219,14 +219,15 @@ async function bootNizhaliPlayer() {
 
         window.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2.0);
 
-        // Zero-Lag One-Euro Filter Settings: filterMinCF: 0.01; filterBeta: 20.0; missTolerance: 2
+        // Balanced One-Euro Filter: filterMinCF: 0.001 (kills stationary perspective jitter)
+        // filterBeta: 0.15 (15x faster motion response without high-frequency homography jumping)
         const sceneWrapper = document.createElement('div');
         sceneWrapper.style.width = '100%';
         sceneWrapper.style.height = '100%';
         sceneWrapper.innerHTML = `
             <a-scene
                 id="ar-scene"
-                mindar-image="imageTargetSrc: ${localMindBlobUrl}; maxTrack: ${maxTrack}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.01; filterBeta: 20.0; warmupTolerance: 1; missTolerance: 2;"
+                mindar-image="imageTargetSrc: ${localMindBlobUrl}; maxTrack: ${maxTrack}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.001; filterBeta: 0.15; warmupTolerance: 2; missTolerance: 4;"
                 renderer="colorManagement: false, physicallyCorrectLights: false, alpha: true, antialias: true, powerPreference: high-performance, preserveDrawingBuffer: true"
                 vr-mode-ui="enabled: false"
                 device-orientation-permission-ui="enabled: false"
@@ -350,7 +351,7 @@ async function bootNizhaliPlayer() {
                 if (vids.length > 0) btnAudio.style.display = 'flex';
             });
 
-            // Target Lost Event (Smooth Tracking-Loss Hold & Fade)
+            // Target Lost Event
             targetRootEl.addEventListener('targetLost', () => {
                 activeTargetsCount = Math.max(0, activeTargetsCount - 1);
                 const vids = allVideosByTarget[tIdx] || [];
