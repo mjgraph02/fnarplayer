@@ -1,42 +1,42 @@
 // ============================================================================
-// MODULE 05 // UNDO/REDO HISTORY, PROJECT.JSON SAVE/LOAD & MULTI-TARGET EXPORT
+// MODULE 05 // UNDO/REDO HISTORY, PROJECT.JSON SAVE/LOAD & MULTI-TARGET EXPORT (V7.4.2)
 // ============================================================================
 
-let undoStack = [];
-let undoPtr = -1;
-let busyRestore = false;
+window.undoStack = [];
+window.undoPtr = -1;
+window.busyRestore = false;
 
 window.saveHistoryState = function() {
-    if (busyRestore) return;
-    const snap = JSON.stringify(buildProjectPayload());
-    if (undoPtr >= 0 && undoStack[undoPtr] === snap) return;
-    undoStack = undoStack.slice(0, undoPtr + 1);
-    undoStack.push(snap);
-    if (undoStack.length > 40) undoStack.shift(); else undoPtr++;
+    if (window.busyRestore) return;
+    const snap = JSON.stringify(window.buildProjectPayload());
+    if (window.undoPtr >= 0 && window.undoStack[window.undoPtr] === snap) return;
+    window.undoStack = window.undoStack.slice(0, window.undoPtr + 1);
+    window.undoStack.push(snap);
+    if (window.undoStack.length > 40) window.undoStack.shift(); else window.undoPtr++;
     const uBtn = document.getElementById('btn-undo');
     const rBtn = document.getElementById('btn-redo');
-    if (uBtn) uBtn.disabled = (undoPtr <= 0);
-    if (rBtn) rBtn.disabled = (undoPtr >= undoStack.length - 1);
+    if (uBtn) uBtn.disabled = (window.undoPtr <= 0);
+    if (rBtn) rBtn.disabled = (window.undoPtr >= window.undoStack.length - 1);
 };
 
 window.undo = function() {
-    if (undoPtr > 0) {
-        undoPtr--;
-        applyProjectPayload(JSON.parse(undoStack[undoPtr]));
+    if (window.undoPtr > 0) {
+        window.undoPtr--;
+        window.applyProjectPayload(JSON.parse(window.undoStack[window.undoPtr]));
     }
 };
 
 window.redo = function() {
-    if (undoPtr < undoStack.length - 1) {
-        undoPtr++;
-        applyProjectPayload(JSON.parse(undoStack[undoPtr]));
+    if (window.undoPtr < window.undoStack.length - 1) {
+        window.undoPtr++;
+        window.applyProjectPayload(JSON.parse(window.undoStack[window.undoPtr]));
     }
 };
 
-function buildProjectPayload() {
+window.buildProjectPayload = function() {
     return {
-        version: '7.4', // V7.4 Upgrade
-        mindUrl: projectState.mindUrl || document.getElementById('mindUrlInput').value.trim(),
+        version: '7.4', 
+        mindUrl: window.projectState.mindUrl || document.getElementById('mindUrlInput')?.value.trim(),
         global: {
             autoLight: document.getElementById('globalAutoLight')?.checked ?? true,
             autoAudio: document.getElementById('globalAutoAudio')?.checked ?? false,
@@ -44,9 +44,9 @@ function buildProjectPayload() {
             lossHoldTime: parseFloat(document.getElementById('globalLossTime')?.value) || 0.35,
             maxTrack: parseInt(document.getElementById('globalMaxTrack')?.value) || 1
         },
-        activeTargetIndex: projectState.activeTargetIndex,
-        targetIndexMap: projectState.targetIndexMap || [],
-        targets: projectState.targets.map(t => ({
+        activeTargetIndex: window.projectState.activeTargetIndex,
+        targetIndexMap: window.projectState.targetIndexMap || [],
+        targets: window.projectState.targets.map(t => ({
             id: t.id,
             name: t.name,
             mode: t.mode,
@@ -56,7 +56,7 @@ function buildProjectPayload() {
             toyOccluder: t.toyOccluder,
             toyPnpPoints: t.toyPnpPoints || [],
             faceOccluder: t.faceOccluder,
-            customDuration: parseFloat(document.getElementById('customDurationInput').value) || 5.0,
+            customDuration: parseFloat(document.getElementById('customDurationInput')?.value) || 5.0,
             layers: t.layers.map(l => ({
                 id: l.id,
                 name: l.name,
@@ -80,28 +80,30 @@ function buildProjectPayload() {
                 animSpeed: l.animSpeed,
                 animAmp: l.animAmp,
                 keyframes: l.keyframes,
-                // New V7.4 Parameters
                 playbackRule: l.playbackRule || 'loop',
                 delay: l.delay || 0,
                 blendMode: l.blendMode || 'normal'
             }))
         }))
     };
-}
+};
 
-function applyProjectPayload(data) {
-    busyRestore = true;
-    transformControl.detach();
-    layers.forEach(l => {
-        if (l.mesh && l.mesh.parent) l.mesh.parent.remove(l.mesh);
-        if (l.videoEl) { l.videoEl.pause(); l.videoEl.remove(); }
-    });
+window.applyProjectPayload = function(data) {
+    window.busyRestore = true;
+    if (window.transformControl) window.transformControl.detach();
+    if (window.layers) {
+        window.layers.forEach(l => {
+            if (l.mesh && l.mesh.parent) l.mesh.parent.remove(l.mesh);
+            if (l.videoEl) { l.videoEl.pause(); l.videoEl.remove(); }
+        });
+    }
 
-    projectState.mindUrl = data.mindUrl || '';
-    document.getElementById('mindUrlInput').value = projectState.mindUrl;
-    projectState.targetIndexMap = data.targetIndexMap || [];
+    window.projectState.mindUrl = data.mindUrl || '';
+    const mindInp = document.getElementById('mindUrlInput');
+    if (mindInp) mindInp.value = window.projectState.mindUrl;
+    
+    window.projectState.targetIndexMap = data.targetIndexMap || [];
 
-    // Restore V7.4 Global Director Settings
     if (data.global) {
         const gLight = document.getElementById('globalAutoLight');
         if (gLight) gLight.checked = data.global.autoLight !== false;
@@ -119,44 +121,44 @@ function applyProjectPayload(data) {
         if (gMax) gMax.value = data.global.maxTrack || 1;
     }
 
-    projectState.targets = (data.targets || []).map((tData, idx) => {
-        const slot = createDefaultTargetSlot(tData.mode || 'image', idx);
+    window.projectState.targets = (data.targets || []).map((tData, idx) => {
+        const slot = window.createDefaultTargetSlot(tData.mode || 'image', idx);
         Object.assign(slot, tData);
         slot.layers = [];
         const savedLayers = tData.layers || [];
-        savedLayers.filter(s => s.isFolder).forEach(s => slot.layers.push(createLayerObject(s)));
+        savedLayers.filter(s => s.isFolder).forEach(s => slot.layers.push(window.createLayerObject(s)));
         savedLayers.filter(s => !s.isFolder).forEach(s => {
-            const l = createLayerObject(s);
+            const l = window.createLayerObject(s);
             if (l.parentId) {
                 const pf = slot.layers.find(f => f.id === l.parentId);
                 if (pf && pf.mesh) pf.mesh.add(l.mesh);
             }
-            if (l.url && !l.isMaskPlane) applyMediaToLayer(l, cleanDropbox(l.url), l.url, true);
+            if (l.url && !l.isMaskPlane) window.applyMediaToLayer(l, window.cleanDropbox(l.url), l.url, true);
             slot.layers.push(l);
         });
-        slot.layers.forEach(l => { if (l.mesh && l.mesh.parent === scene) scene.remove(l.mesh); });
+        slot.layers.forEach(l => { if (l.mesh && l.mesh.parent === window.scene && window.scene) window.scene.remove(l.mesh); });
         return slot;
     });
 
-    switchTargetSlot(data.activeTargetIndex || 0);
+    window.switchTargetSlot(data.activeTargetIndex || 0);
     const uBtn = document.getElementById('btn-undo');
     const rBtn = document.getElementById('btn-redo');
-    if (uBtn) uBtn.disabled = (undoPtr <= 0);
-    if (rBtn) rBtn.disabled = (undoPtr >= undoStack.length - 1);
-    busyRestore = false;
-}
+    if (uBtn) uBtn.disabled = (window.undoPtr <= 0);
+    if (rBtn) rBtn.disabled = (window.undoPtr >= window.undoStack.length - 1);
+    window.busyRestore = false;
+};
 
 window.saveProjectJsonFile = function() {
-    const jsonStr = JSON.stringify(buildProjectPayload(), null, 2);
+    const jsonStr = JSON.stringify(window.buildProjectPayload(), null, 2);
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob([jsonStr], { type: 'application/json' }));
     link.download = 'project.json';
     link.click();
-    showToast('💾 Downloaded project.json! Upload to client folder.');
+    if (window.showToast) window.showToast('💾 Downloaded project.json! Upload to client folder.');
 };
 
 window.loadProjectJsonFile = function() {
-    document.getElementById('projectJsonInput').click();
+    document.getElementById('projectJsonInput')?.click();
 };
 
 window.handleProjectJsonUpload = function(ev) {
@@ -165,9 +167,9 @@ window.handleProjectJsonUpload = function(ev) {
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
-            applyProjectPayload(JSON.parse(e.target.result));
-            saveHistoryState();
-            showToast('📂 Loaded project.json into Studio!');
+            window.applyProjectPayload(JSON.parse(e.target.result));
+            window.saveHistoryState();
+            if (window.showToast) window.showToast('📂 Loaded project.json into Studio!');
         } catch (err) {
             alert('Invalid project.json file');
         }
@@ -175,8 +177,7 @@ window.handleProjectJsonUpload = function(ev) {
     reader.readAsText(f);
 };
 
-// Compute effective local-target transform for a layer (even if inside a folder or on an inactive tab)
-function computeLayerExportTransform(l, slotLayers) {
+window.computeLayerExportTransform = function(l, slotLayers) {
     if (!l.parentId) {
         return {
             p: [+l.pos[0].toFixed(3), +l.pos[1].toFixed(3), +l.pos[2].toFixed(3)],
@@ -197,24 +198,23 @@ function computeLayerExportTransform(l, slotLayers) {
         s: [+(pf.scale[0] * l.scale[0]).toFixed(3), +(pf.scale[1] * l.scale[1]).toFixed(3), +(pf.scale[2] * l.scale[2]).toFixed(3)],
         r: [+(pf.rot[0] + l.rot[0]).toFixed(1), +(pf.rot[1] + l.rot[1]).toFixed(1), +(pf.rot[2] + l.rot[2]).toFixed(1)]
     };
-}
+};
 
 window.exportProject = function() {
-    const projUrl = document.getElementById('projectJsonUrlInput').value.trim();
+    const projUrl = document.getElementById('projectJsonUrlInput')?.value.trim();
     const base = window.location.origin + window.location.pathname.replace('creator.html', '');
     let finalLink = '';
 
     if (projUrl) {
         finalLink = `${base}?project=${encodeURIComponent(projUrl)}`;
     } else {
-        const mind = projectState.mindUrl || document.getElementById('mindUrlInput').value.trim();
-        const customDur = parseFloat(document.getElementById('customDurationInput').value) || 5.0;
+        const mind = window.projectState.mindUrl || document.getElementById('mindUrlInput')?.value.trim();
+        const customDur = parseFloat(document.getElementById('customDurationInput')?.value) || 5.0;
 
-        // Export ALL target slots in order so Multi-Target (Print 1, Print 2, etc.) works 100%!
-        const exportedTargets = projectState.targets.map((slot, tIdx) => {
+        const exportedTargets = window.projectState.targets.map((slot, tIdx) => {
             const slotLayers = slot.layers || [];
             const masks = slotLayers.filter(l => l.isMaskPlane).map(m => {
-                const tr = computeLayerExportTransform(m, slotLayers);
+                const tr = window.computeLayerExportTransform(m, slotLayers);
                 return { id: m.id, p: tr.p, s: tr.s, r: tr.r };
             });
 
@@ -228,7 +228,7 @@ window.exportProject = function() {
             const slotDur = slotMaxDur > 0 ? +slotMaxDur.toFixed(2) : (slotHasAnim ? customDur : 0);
 
             const mediaLayers = slotLayers.filter(l => !l.isFolder && !l.isMaskPlane).map(l => {
-                const tr = computeLayerExportTransform(l, slotLayers);
+                const tr = window.computeLayerExportTransform(l, slotLayers);
                 return {
                     t: l.chromaEnabled ? 'chroma' : l.type,
                     u: l.url,
@@ -244,7 +244,6 @@ window.exportProject = function() {
                     as: l.animSpeed ?? 1.0,
                     aa: l.animAmp ?? 1.0,
                     kf: l.keyframes || {},
-                    // Compact V7.4 properties for URL limits
                     pr: l.playbackRule || 'loop',
                     dl: l.delay || 0,
                     bm: l.blendMode || 'normal'
@@ -279,7 +278,9 @@ window.exportProject = function() {
     }
 
     const box = document.getElementById('export-box');
-    box.style.display = 'block';
-    box.innerHTML = `<b>V7.4 MULTI-TARGET LINK:</b><br><a href="${finalLink}" target="_blank" style="color:var(--te-green);">${finalLink}</a>`;
-    showToast(`⚡ Exported ${projectState.targets.length} Target(s) to V7.4 Link!`);
+    if (box) {
+        box.style.display = 'block';
+        box.innerHTML = `<b>V7.4 MULTI-TARGET LINK:</b><br><a href="${finalLink}" target="_blank" style="color:var(--te-green);">${finalLink}</a>`;
+    }
+    if (window.showToast) window.showToast(`⚡ Exported ${window.projectState.targets.length} Target(s) to V7.4 Link!`);
 };
