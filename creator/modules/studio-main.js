@@ -1,14 +1,14 @@
 // ============================================================================
-// MODULE 06 // HIERARCHY, INSPECTOR UI SYNC, SHORTCUTS & STUDIO BOOT (V7.4)
+// MODULE 06 // HIERARCHY, INSPECTOR UI SYNC, SHORTCUTS & STUDIO BOOT (V7.4.2)
 // ============================================================================
 
 window.groupSelectedLayers = function() {
-    const valid = selectedIds.map(id => layers.find(l => l.id === id)).filter(l => l && !l.isFolder);
+    const valid = window.selectedIds.map(id => window.layers.find(l => l.id === id)).filter(l => l && !l.isFolder);
     if (valid.length < 1) return alert('Select 1 or more layers to group!');
 
     const fId = 'folder_' + Date.now();
-    const count = layers.filter(l => l.isFolder).length + 1;
-    const fObj = createLayerObject({ id: fId, name: `FOLDER_${count}`, isFolder: true, type: 'folder' });
+    const count = window.layers.filter(l => l.isFolder).length + 1;
+    const fObj = window.createLayerObject({ id: fId, name: `FOLDER_${count}`, isFolder: true, type: 'folder' });
 
     valid.forEach(ch => {
         ch.parentId = fId;
@@ -21,22 +21,22 @@ window.groupSelectedLayers = function() {
             ];
         }
     });
-    layers.push(fObj);
-    selectSingleLayer(fId);
-    if (window.saveHistoryState) saveHistoryState();
+    window.layers.push(fObj);
+    window.selectSingleLayer(fId);
+    if (window.saveHistoryState) window.saveHistoryState();
 };
 
 window.ungroupSelectedFolder = function() {
-    const item = getPrimarySelectedItem();
+    const item = window.getPrimarySelectedItem();
     if (!item) return;
-    const folder = item.isFolder ? item : layers.find(l => l.id === item.parentId);
+    const folder = item.isFolder ? item : window.layers.find(l => l.id === item.parentId);
     if (!folder || !folder.isFolder) return;
 
-    const children = layers.filter(l => l.parentId === folder.id);
+    const children = window.layers.filter(l => l.parentId === folder.id);
     children.forEach(ch => {
         ch.parentId = null;
         if (ch.mesh) {
-            scene.attach(ch.mesh);
+            window.scene.attach(ch.mesh);
             ch.pos = [
                 parseFloat(ch.mesh.position.x.toFixed(3)),
                 parseFloat(ch.mesh.position.y.toFixed(3)),
@@ -44,44 +44,45 @@ window.ungroupSelectedFolder = function() {
             ];
         }
     });
-    transformControl.detach();
-    scene.remove(folder.mesh);
-    const slot = getActiveTargetSlot();
-    slot.layers = layers.filter(l => l.id !== folder.id);
-    layers = slot.layers;
-    selectedIds = children.map(c => c.id);
-    updateSelectionState();
-    if (window.saveHistoryState) saveHistoryState();
+    if (window.transformControl) window.transformControl.detach();
+    if (window.scene && folder.mesh) window.scene.remove(folder.mesh);
+    
+    const slot = window.getActiveTargetSlot();
+    slot.layers = window.layers.filter(l => l.id !== folder.id);
+    window.layers = slot.layers;
+    window.selectedIds = children.map(c => c.id);
+    window.updateSelectionState();
+    if (window.saveHistoryState) window.saveHistoryState();
 };
 
 window.selectSingleLayer = function(id) {
-    selectedIds = id ? [id] : [];
-    lastClickedId = id;
-    updateSelectionState();
+    window.selectedIds = id ? [id] : [];
+    window.lastClickedId = id;
+    window.updateSelectionState();
 };
 
 window.handleLayerClick = function(id, ev) {
     if (ev && (ev.ctrlKey || ev.metaKey)) {
-        if (selectedIds.includes(id)) selectedIds = selectedIds.filter(x => x !== id);
-        else selectedIds.push(id);
-        lastClickedId = id;
-    } else if (ev && ev.shiftKey && lastClickedId) {
-        const all = layers.map(l => l.id);
-        const s = all.indexOf(lastClickedId), e = all.indexOf(id);
-        if (s !== -1 && e !== -1) selectedIds = all.slice(Math.min(s, e), Math.max(s, e) + 1);
+        if (window.selectedIds.includes(id)) window.selectedIds = window.selectedIds.filter(x => x !== id);
+        else window.selectedIds.push(id);
+        window.lastClickedId = id;
+    } else if (ev && ev.shiftKey && window.lastClickedId) {
+        const all = window.layers.map(l => l.id);
+        const s = all.indexOf(window.lastClickedId), e = all.indexOf(id);
+        if (s !== -1 && e !== -1) window.selectedIds = all.slice(Math.min(s, e), Math.max(s, e) + 1);
     } else {
-        selectedIds = [id];
-        lastClickedId = id;
+        window.selectedIds = [id];
+        window.lastClickedId = id;
     }
-    updateSelectionState();
+    window.updateSelectionState();
 };
 
 window.updateSelectionState = function() {
-    renderLayerList();
-    const primary = getPrimarySelectedItem();
+    window.renderLayerList();
+    const primary = window.getPrimarySelectedItem();
 
     if (!primary) {
-        transformControl.detach();
+        if (window.transformControl) window.transformControl.detach();
         document.getElementById('inspectorEmpty').style.display = 'block';
         document.getElementById('inspectorControls').style.display = 'none';
         document.getElementById('inspectorFocusBtn').style.display = 'none';
@@ -93,13 +94,13 @@ window.updateSelectionState = function() {
     document.getElementById('inspectorFocusBtn').style.display = 'inline-block';
     document.getElementById('inpLocalFile').value = '';
 
-    if (primary.mesh) transformControl.attach(primary.mesh);
-    refreshInspectorUI();
-    if (window.refreshKeyframeDiamonds) refreshKeyframeDiamonds();
+    if (primary.mesh && window.transformControl) window.transformControl.attach(primary.mesh);
+    window.refreshInspectorUI();
+    if (window.refreshKeyframeDiamonds) window.refreshKeyframeDiamonds();
 };
 
 window.refreshInspectorUI = function() {
-    const l = getPrimarySelectedItem();
+    const l = window.getPrimarySelectedItem();
     if (!l) return;
 
     document.getElementById('inpName').value = l.name;
@@ -116,7 +117,6 @@ window.refreshInspectorUI = function() {
         document.getElementById('inpOpacity').value = l.opacity ?? 1.0;
         document.getElementById('opacityVal').textContent = (l.opacity ?? 1.0).toFixed(2);
 
-        // V7.4 UI Bindings
         const propPlayback = document.getElementById('propPlayback');
         if (propPlayback) propPlayback.value = l.playbackRule || 'loop';
         
@@ -128,7 +128,7 @@ window.refreshInspectorUI = function() {
 
         const clipSel = document.getElementById('clipSourceSelect');
         let opts = '<option value="none">None (Unclipped)</option><option value="target">🕳️ Target Frame Bounds</option>';
-        layers.filter(m => m.isMaskPlane).forEach(mp => {
+        window.layers.filter(m => m.isMaskPlane).forEach(mp => {
             opts += `<option value="${mp.id}">✂️ ${mp.name}</option>`;
         });
         clipSel.innerHTML = opts;
@@ -161,7 +161,7 @@ window.refreshInspectorUI = function() {
         document.getElementById('smoothVal').textContent = l.smoothness ?? 0.08;
     }
 
-    populateInspectorNumbers(l);
+    window.populateInspectorNumbers(l);
 };
 
 window.populateInspectorNumbers = function(l) {
@@ -177,10 +177,10 @@ window.populateInspectorNumbers = function(l) {
 };
 
 window.syncUIFromInspector = function() {
-    const l = getPrimarySelectedItem();
+    const l = window.getPrimarySelectedItem();
     if (!l) return;
     l.name = document.getElementById('inpName').value;
-    renderLayerList();
+    window.renderLayerList();
 };
 
 window.applyTransformAndEffectsImmediate = function(l) {
@@ -192,18 +192,17 @@ window.applyTransformAndEffectsImmediate = function(l) {
         THREE.MathUtils.degToRad(l.rot[1]),
         THREE.MathUtils.degToRad(l.rot[2])
     );
-    if (window.updateLayerClippingAndOpacity) updateLayerClippingAndOpacity(l, l.opacity ?? 1.0);
+    if (window.updateLayerClippingAndOpacity) window.updateLayerClippingAndOpacity(l, l.opacity ?? 1.0);
 };
 
 window.syncEffectsFromInputs = function() {
-    const l = getPrimarySelectedItem();
+    const l = window.getPrimarySelectedItem();
     if (!l || l.isFolder || l.isMaskPlane) return;
 
     l.clipSource = document.getElementById('clipSourceSelect').value;
     l.animPreset = document.getElementById('animPreset').value;
     document.getElementById('animParamsBox').style.display = (l.animPreset !== 'none') ? 'block' : 'none';
 
-    // V7.4 Playback and Blend Mapping
     if (document.getElementById('propPlayback')) l.playbackRule = document.getElementById('propPlayback').value;
     if (document.getElementById('propDelay')) l.delay = parseFloat(document.getElementById('propDelay').value) || 0;
     if (document.getElementById('propBlend')) l.blendMode = document.getElementById('propBlend').value;
@@ -216,76 +215,78 @@ window.syncEffectsFromInputs = function() {
         l.mesh.material.uniforms.enableChroma.value = l.chromaEnabled ? 1.0 : 0.0;
         l.mesh.material.uniforms.color.value.set(l.color);
     }
-    if (window.updateLayerClippingAndOpacity) updateLayerClippingAndOpacity(l, l.opacity ?? 1.0);
-    renderLayerList();
+    if (window.updateLayerClippingAndOpacity) window.updateLayerClippingAndOpacity(l, l.opacity ?? 1.0);
+    window.renderLayerList();
 };
 
 window.handleLocalFile = function(e) {
     const file = e.target.files[0];
-    const l = getPrimarySelectedItem();
+    const l = window.getPrimarySelectedItem();
     if (!file || !l) return;
     l.localBlobUrl = URL.createObjectURL(file);
-    if (window.applyMediaToLayer) applyMediaToLayer(l, l.localBlobUrl, file.name);
-    if (window.saveHistoryState) saveHistoryState();
+    if (window.applyMediaToLayer) window.applyMediaToLayer(l, l.localBlobUrl, file.name);
+    if (window.saveHistoryState) window.saveHistoryState();
 };
 
 let urlFetchTimer = null;
 window.handleDropboxUrl = function() {
-    const l = getPrimarySelectedItem();
+    const l = window.getPrimarySelectedItem();
     if (!l) return;
     l.url = document.getElementById('inpUrl').value.trim();
     clearTimeout(urlFetchTimer);
     if (l.url) {
         urlFetchTimer = setTimeout(() => {
-            if (window.applyMediaToLayer) applyMediaToLayer(l, window.cleanDropbox(l.url), l.url);
-            if (window.saveHistoryState) saveHistoryState();
+            if (window.applyMediaToLayer) window.applyMediaToLayer(l, window.cleanDropbox(l.url), l.url);
+            if (window.saveHistoryState) window.saveHistoryState();
         }, 400);
     }
 };
 
 window.deleteSelectedLayers = function() {
-    if (selectedIds.length === 0) return;
-    transformControl.detach();
-    selectedIds.forEach(id => {
-        const l = layers.find(x => x.id === id);
+    if (!window.selectedIds || window.selectedIds.length === 0) return;
+    if (window.transformControl) window.transformControl.detach();
+    
+    window.selectedIds.forEach(id => {
+        const l = window.layers.find(x => x.id === id);
         if (!l) return;
         if (l.isFolder) {
-            layers.filter(c => c.parentId === l.id).forEach(ch => {
+            window.layers.filter(c => c.parentId === l.id).forEach(ch => {
                 ch.parentId = null;
-                if (ch.mesh) scene.attach(ch.mesh);
+                if (ch.mesh && window.scene) window.scene.attach(ch.mesh);
             });
         }
         if (l.mesh && l.mesh.parent) l.mesh.parent.remove(l.mesh);
         if (l.videoEl) { l.videoEl.pause(); l.videoEl.remove(); }
     });
-    const slot = getActiveTargetSlot();
-    slot.layers = layers.filter(l => !selectedIds.includes(l.id));
-    layers = slot.layers;
-    selectedIds = layers.length ? [layers[layers.length - 1].id] : [];
-    if (window.updateMasterDuration) updateMasterDuration();
-    updateSelectionState();
-    if (window.saveHistoryState) saveHistoryState();
+    
+    const slot = window.getActiveTargetSlot();
+    slot.layers = window.layers.filter(l => !window.selectedIds.includes(l.id));
+    window.layers = slot.layers;
+    window.selectedIds = window.layers.length ? [window.layers[window.layers.length - 1].id] : [];
+    if (window.updateMasterDuration) window.updateMasterDuration();
+    window.updateSelectionState();
+    if (window.saveHistoryState) window.saveHistoryState();
 };
 
 window.renderLayerList = function() {
     const list = document.getElementById('layerList');
-    if (!layers || layers.length === 0) {
+    if (!window.layers || window.layers.length === 0) {
         list.innerHTML = '<div style="color:var(--text-muted); font-size:10px; padding:6px 0;">NO LAYERS IN TARGET</div>';
         return;
     }
     list.innerHTML = '';
-    layers.filter(l => !l.parentId).forEach(item => {
+    window.layers.filter(l => !l.parentId).forEach(item => {
         appendHierarchyRow(list, item, false);
         if (item.isFolder) {
-            layers.filter(ch => ch.parentId === item.id).forEach(child => appendHierarchyRow(list, child, true));
+            window.layers.filter(ch => ch.parentId === item.id).forEach(child => appendHierarchyRow(list, child, true));
         }
     });
 };
 
 function appendHierarchyRow(containerEl, l, isChild) {
     const item = document.createElement('div');
-    const isPrimary = (selectedIds[selectedIds.length - 1] === l.id);
-    const isMulti = selectedIds.includes(l.id);
+    const isPrimary = (window.selectedIds[window.selectedIds.length - 1] === l.id);
+    const isMulti = window.selectedIds.includes(l.id);
     item.className = 'layer-item' + (isPrimary ? ' active' : (isMulti ? ' multi-selected' : '')) + (isChild ? ' child-layer' : '');
 
     const icon = l.isFolder ? '📁 ' : (l.isMaskPlane ? '✂️ ' : (l.type === 'glb' ? '🧊 ' : (l.type === 'image' ? '🖼️ ' : '🎬 ')));
@@ -301,46 +302,72 @@ function appendHierarchyRow(containerEl, l, isChild) {
     findBtn.textContent = '🎯';
     findBtn.onclick = (e) => {
         e.stopPropagation();
-        selectSingleLayer(l.id);
-        if (window.focusSelectedLayer) focusSelectedLayer();
+        window.selectSingleLayer(l.id);
+        if (window.focusSelectedLayer) window.focusSelectedLayer();
     };
 
     rightGroup.appendChild(zBadge);
     rightGroup.appendChild(findBtn);
     item.appendChild(titleSpan);
     item.appendChild(rightGroup);
-    item.onclick = (e) => handleLayerClick(l.id, e);
+    item.onclick = (e) => window.handleLayerClick(l.id, e);
     containerEl.appendChild(item);
 }
 
 // Gizmo, Camera Presets & Keyboard Shortcuts
-let spaceHeld = false;
+window.spaceHeld = false;
 
-transformControl.addEventListener('dragging-changed', (ev) => {
-    if (window.orbit) window.orbit.enabled = !ev.value;
-    if (!ev.value) {
-        if (autoKeyEnabled && window.addKeyframeForGroup) addKeyframeForGroup('transform');
-        if (window.saveHistoryState) saveHistoryState();
+window.addEventListener('load', () => {
+    if (window.transformControl) {
+        window.transformControl.addEventListener('dragging-changed', (ev) => {
+            if (window.orbit) window.orbit.enabled = !ev.value;
+            if (!ev.value) {
+                if (window.autoKeyEnabled && window.addKeyframeForGroup) window.addKeyframeForGroup('transform');
+                if (window.saveHistoryState) window.saveHistoryState();
+            }
+        });
+
+        window.transformControl.addEventListener('change', () => {
+            const active = window.getPrimarySelectedItem();
+            if (!active || !active.mesh) return;
+            const m = active.mesh;
+            active.pos = [+m.position.x.toFixed(3), +m.position.y.toFixed(3), +m.position.z.toFixed(3)];
+            active.scale = [+m.scale.x.toFixed(3), +m.scale.y.toFixed(3), +m.scale.z.toFixed(3)];
+            active.rot = [
+                +THREE.MathUtils.radToDeg(m.rotation.x).toFixed(1),
+                +THREE.MathUtils.radToDeg(m.rotation.y).toFixed(1),
+                +THREE.MathUtils.radToDeg(m.rotation.z).toFixed(1)
+            ];
+            window.populateInspectorNumbers(active);
+            window.renderLayerList();
+        });
+    }
+
+    // Raycast Selection on Canvas
+    window.picker = new THREE.Raycaster();
+    window.ptr = new THREE.Vector2();
+    window.pStart = { x: 0, y: 0 };
+
+    if (window.canvas) {
+        window.canvas.addEventListener('pointerdown', (e) => { window.pStart = { x: e.clientX, y: e.clientY }; });
+        window.canvas.addEventListener('pointerup', (e) => {
+            if (window.spaceHeld || Math.hypot(e.clientX - window.pStart.x, e.clientY - window.pStart.y) > 5) return;
+            const r = window.canvas.getBoundingClientRect();
+            window.ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+            window.picker.setFromCamera(window.ptr, window.camera);
+            const targets = window.layers.filter(l => !l.isFolder && l.mesh && l.mesh.visible).map(l => l.mesh);
+            const hits = window.picker.intersectObjects(targets, true);
+            if (hits.length) {
+                let node = hits[0].object;
+                while (node.parent && !node.userData.layerId) node = node.parent;
+                if (node.userData.layerId) window.handleLayerClick(node.userData.layerId, e);
+            }
+        });
     }
 });
 
-transformControl.addEventListener('change', () => {
-    const active = getPrimarySelectedItem();
-    if (!active || !active.mesh) return;
-    const m = active.mesh;
-    active.pos = [+m.position.x.toFixed(3), +m.position.y.toFixed(3), +m.position.z.toFixed(3)];
-    active.scale = [+m.scale.x.toFixed(3), +m.scale.y.toFixed(3), +m.scale.z.toFixed(3)];
-    active.rot = [
-        +THREE.MathUtils.radToDeg(m.rotation.x).toFixed(1),
-        +THREE.MathUtils.radToDeg(m.rotation.y).toFixed(1),
-        +THREE.MathUtils.radToDeg(m.rotation.z).toFixed(1)
-    ];
-    populateInspectorNumbers(active);
-    renderLayerList();
-});
-
 window.setGizmoMode = (m) => {
-    transformControl.setMode(m);
+    if (window.transformControl) window.transformControl.setMode(m);
     ['translate', 'rotate', 'scale'].forEach(k => {
         const b = document.getElementById('gizmo-' + k);
         if (b) b.classList.toggle('active', k === m);
@@ -349,7 +376,7 @@ window.setGizmoMode = (m) => {
 
 window.setCameraPreset = (view) => {
     if (!window.camera || !window.orbit) return;
-    camAnim = null;
+    window.camAnim = null;
     window.orbit.target.set(0, 0, 0);
     const presets = {
         front: [0, 0, 1.6, 0, 1, 0],
@@ -364,9 +391,9 @@ window.setCameraPreset = (view) => {
 };
 
 window.focusSelectedLayer = () => {
-    const item = getPrimarySelectedItem();
+    const item = window.getPrimarySelectedItem();
     if (!item || !item.mesh) {
-        camAnim = {
+        window.camAnim = {
             progress: 0, startPos: window.camera.position.clone(), startTarget: window.orbit.target.clone(),
             endTarget: new THREE.Vector3(0, 0, 0), endPos: new THREE.Vector3(0, -0.9, 1.4)
         };
@@ -377,7 +404,7 @@ window.focusSelectedLayer = () => {
     const sz = bounds.getSize(new THREE.Vector3());
     const dist = Math.max(sz.x, sz.y, sz.z, 0.4) * 1.65;
     const offset = window.camera.position.clone().sub(window.orbit.target).normalize().multiplyScalar(dist);
-    camAnim = {
+    window.camAnim = {
         progress: 0, startPos: window.camera.position.clone(), startTarget: window.orbit.target.clone(),
         endTarget: center, endPos: center.clone().add(offset)
     };
@@ -387,56 +414,34 @@ window.addEventListener('keydown', (ev) => {
     const tag = document.activeElement ? document.activeElement.tagName : '';
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') {
         ev.preventDefault();
-        return ev.shiftKey ? redo() : undo();
+        return ev.shiftKey ? window.redo() : window.undo();
     }
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'g') {
         ev.preventDefault();
-        return groupSelectedLayers();
+        return window.groupSelectedLayers();
     }
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
 
-    if (ev.code === 'Space' && !spaceHeld && window.container && window.orbit) {
+    if (ev.code === 'Space' && !window.spaceHeld && window.container && window.orbit) {
         ev.preventDefault();
-        spaceHeld = true;
+        window.spaceHeld = true;
         window.container.classList.add('space-pan');
         window.orbit.mouseButtons.LEFT = THREE.MOUSE.PAN;
     }
     const k = ev.key.toLowerCase();
-    if (k === 'w') setGizmoMode('translate');
-    if (k === 'e') setGizmoMode('rotate');
-    if (k === 'r') setGizmoMode('scale');
-    if (k === 'f') { ev.preventDefault(); focusSelectedLayer(); }
+    if (k === 'w') window.setGizmoMode('translate');
+    if (k === 'e') window.setGizmoMode('rotate');
+    if (k === 'r') window.setGizmoMode('scale');
+    if (k === 'f') { ev.preventDefault(); window.focusSelectedLayer(); }
 });
 
 window.addEventListener('keyup', (ev) => {
     if (ev.code === 'Space' && window.container && window.orbit) {
-        spaceHeld = false;
+        window.spaceHeld = false;
         window.container.classList.remove('space-pan');
         window.orbit.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
     }
 });
-
-// Raycast Selection on Canvas
-const picker = new THREE.Raycaster();
-const ptr = new THREE.Vector2();
-let pStart = { x: 0, y: 0 };
-
-if (window.canvas) {
-    window.canvas.addEventListener('pointerdown', (e) => { pStart = { x: e.clientX, y: e.clientY }; });
-    window.canvas.addEventListener('pointerup', (e) => {
-        if (spaceHeld || Math.hypot(e.clientX - pStart.x, e.clientY - pStart.y) > 5) return;
-        const r = window.canvas.getBoundingClientRect();
-        ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-        picker.setFromCamera(ptr, window.camera);
-        const targets = layers.filter(l => !l.isFolder && l.mesh && l.mesh.visible).map(l => l.mesh);
-        const hits = picker.intersectObjects(targets, true);
-        if (hits.length) {
-            let node = hits[0].object;
-            while (node.parent && !node.userData.layerId) node = node.parent;
-            if (node.userData.layerId) handleLayerClick(node.userData.layerId, e);
-        }
-    });
-}
 
 window.addEventListener('resize', () => {
     if (window.camera && window.container && window.renderer) {
@@ -445,7 +450,3 @@ window.addEventListener('resize', () => {
         window.renderer.setSize(window.container.clientWidth, window.container.clientHeight);
     }
 });
-
-// Boot Nizhali Studio with 1 Default Print Target Slot
-if (window.addNewTargetSlot) addNewTargetSlot('image');
-if (window.animate) animate();
