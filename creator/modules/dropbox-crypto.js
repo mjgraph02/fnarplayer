@@ -199,7 +199,7 @@ function computeLayerExportTransform(l, slotLayers) {
 
 window.exportProject = function() {
     const projUrl = document.getElementById('projectJsonUrlInput').value.trim();
-    const base = window.location.origin + window.location.pathname.replace(/\/creator(\/creator\.html)?\/?$/, '/');
+    const base = new URL('../player/player.html', window.location.href).href;
     let finalLink = '';
 
     if (projUrl) {
