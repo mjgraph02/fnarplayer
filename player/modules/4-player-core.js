@@ -1,5 +1,5 @@
-// ============================================================================
-// PLAYER MODULE 04 // TUNED SENSOR FUSION, GYRO FALLBACK & DEAD-RECKONING HOLD
+=// ============================================================================
+// PLAYER MODULE 04 // ROCK-SOLID SENSOR FUSION & 3D MODEL NORMALIZATION
 // ============================================================================
 
 import '../../vendor/mindar-image-aframe.prod.js';
@@ -68,7 +68,6 @@ AFRAME.registerComponent('nizhali-gyro-fusion', {
         const currentMatrix = this.el.object3D.matrix.clone();
         let isFreshOptical = false;
 
-        // Detect if MindAR output a fresh optical pose by bypassing stale caches
         const isOurOverride = Math.abs(currentMatrix.elements[0] - this.myLastOverride.elements[0]) < 0.0001 &&
                               Math.abs(currentMatrix.elements[12] - this.myLastOverride.elements[12]) < 0.0001;
         const isOldOptical = Math.abs(currentMatrix.elements[0] - this.lastOpticalMatrix.elements[0]) < 0.0001 &&
@@ -79,7 +78,6 @@ AFRAME.registerComponent('nizhali-gyro-fusion', {
             isFreshOptical = true;
         }
 
-        // Compute true physical world rotation from 120Hz hardware gyroscope
         this.euler.set(this.deviceBeta, this.deviceAlpha, -this.deviceGamma, 'YXZ');
         this.cameraQuat.setFromEuler(this.euler);
         this.cameraQuat.multiply(this.q0);
@@ -98,13 +96,11 @@ AFRAME.registerComponent('nizhali-gyro-fusion', {
                 this.anchorQuat.copy(newAnchorQuat);
                 this.hasAnchor = true;
             } else {
-                // The Kalman Blend: Gently correct Gyro drift using Optical Anchor
-                this.anchorPos.lerp(newAnchorPos, 0.15); 
-                this.anchorQuat.slerp(newAnchorQuat, 0.15);
+                this.anchorPos.lerp(newAnchorPos, 0.65); 
+                this.anchorQuat.slerp(newAnchorQuat, 0.65);
             }
         }
 
-        // Apply Dead-Reckoning Hold (Locks graphics during Motion Blur)
         if (this.hasAnchor) {
             const localPos = this.anchorPos.clone().applyQuaternion(Q_camera_inv);
             const localQuat = Q_camera_inv.clone().multiply(this.anchorQuat);
@@ -117,8 +113,35 @@ AFRAME.registerComponent('nizhali-gyro-fusion', {
         }
     }
 });
-// ============================================================================
 
+// ============================================================================
+// FIX: ASYNCHRONOUS 3D MODEL NORMALIZATION
+// ============================================================================
+AFRAME.registerComponent('nizhali-glb-normalize', {
+    init: function() {
+        this.el.addEventListener('model-loaded', () => {
+            const mesh = this.el.getObject3D('mesh');
+            if (!mesh) return;
+
+            mesh.scale.set(1, 1, 1);
+            mesh.position.set(0, 0, 0);
+            mesh.updateMatrixWorld(true);
+
+            const box = new THREE.Box3().setFromObject(mesh);
+            const size = box.getSize(new THREE.Vector3());
+
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0) {
+                mesh.scale.setScalar(1.0 / maxDim);
+            }
+            mesh.updateMatrixWorld(true);
+
+            box.setFromObject(mesh);
+            const center = box.getCenter(new THREE.Vector3());
+            mesh.position.sub(center);
+        });
+    }
+});
 
 function setLoaderProgress(pct, msg) {
     if (brandProgress) brandProgress.style.width = `${pct}%`;
@@ -127,20 +150,10 @@ function setLoaderProgress(pct, msg) {
 
 function applyWhiteLabelBranding(b) {
     if (!b) return;
-    if (b.accent) {
-        document.documentElement.style.setProperty('--accent', b.accent);
-    }
-    if (b.title && brandTitle) {
-        brandTitle.textContent = b.title;
-        document.title = b.title;
-    }
-    if (b.text && brandStatus) {
-        brandStatus.textContent = b.text;
-    }
-    if (b.logo && brandLogo) {
-        brandLogo.src = cleanStorageUrl(b.logo);
-        brandLogo.style.display = 'block';
-    }
+    if (b.accent) document.documentElement.style.setProperty('--accent', b.accent);
+    if (b.title && brandTitle) { brandTitle.textContent = b.title; document.title = b.title; }
+    if (b.text && brandStatus) brandStatus.textContent = b.text;
+    if (b.logo && brandLogo) { brandLogo.src = cleanStorageUrl(b.logo); brandLogo.style.display = 'block'; }
 }
 
 function cleanStorageUrl(url) {
@@ -306,13 +319,13 @@ async function bootNizhaliPlayer() {
                 const entId = `ent-${tIdx}-${lIdx}`;
 
                 if (l.t === 'glb') {
-                    childrenHtml += `<a-gltf-model id="${entId}" src="${l.u}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr}></a-gltf-model>`;
+                    // Added nizhali-glb-normalize directly to the element string
+                    childrenHtml += `<a-gltf-model id="${entId}" src="${l.u}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr} nizhali-glb-normalize></a-gltf-model>`;
                 } else {
                     childrenHtml += `<a-entity id="${entId}" position="${posStr}" scale="${scaleStr}" rotation="${rotStr}" ${compAttr}></a-entity>`;
                 }
             });
 
-            // V8 UPDATE: Added nizhali-gyro-fusion directly to the MindAR root entity!
             allTargetsHtml += `
                 <a-entity id="target-root-${tIdx}" mindar-image-target="targetIndex: ${tIdx}" nizhali-gyro-fusion>
                     ${childrenHtml}
@@ -325,10 +338,11 @@ async function bootNizhaliPlayer() {
         const sceneWrapper = document.createElement('div');
         sceneWrapper.style.width = '100%';
         sceneWrapper.style.height = '100%';
+        
         sceneWrapper.innerHTML = `
             <a-scene
                 id="ar-scene"
-                mindar-image="imageTargetSrc: ${localMindBlobUrl}; maxTrack: ${maxTrack}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.0005; filterBeta: 0.05; warmupTolerance: 1; missTolerance: 5;"
+                mindar-image="imageTargetSrc: ${localMindBlobUrl}; maxTrack: ${maxTrack}; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes; filterMinCF: 0.001; filterBeta: 1000; warmupTolerance: 1; missTolerance: 5;"
                 renderer="colorManagement: false, physicallyCorrectLights: false, alpha: true, antialias: true, powerPreference: high-performance, preserveDrawingBuffer: true"
                 vr-mode-ui="enabled: false"
                 device-orientation-permission-ui="enabled: false"
